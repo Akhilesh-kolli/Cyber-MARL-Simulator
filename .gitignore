@@ -48,3 +48,11 @@ Thumbs.db
 # Optional compressed files
 *.zip
 *.tar.gz
+
+
+__pycache__/
+*.pyc
+venv/
+.env
+.streamlit/secrets.toml
+.DS_Store
