@@ -1,12 +1,13 @@
 import numpy as np
 import gym
 from gym import spaces
+from marlon.real_scan import scan_local_services
 
 
 class GraphCyberEnv(gym.Env):
     """
-    Research-ready Cyber MARL Environment
-    Graph-based attack/defense simulation
+    Advanced Cyber MARL Environment
+    Real-service-aware attacker vs defender simulation
     """
 
     def __init__(self, node_count=6, max_steps=25):
@@ -15,8 +16,9 @@ class GraphCyberEnv(gym.Env):
         self.node_count = node_count
         self.max_steps = max_steps
 
-        # ---- Network topology (adjacency matrix) ----
-        # Example enterprise network layout
+        # ==================================================
+        # NETWORK TOPOLOGY
+        # ==================================================
         self.graph = np.array([
             [0,1,1,0,0,0],
             [1,0,1,1,0,0],
@@ -26,10 +28,59 @@ class GraphCyberEnv(gym.Env):
             [0,0,0,1,1,0],
         ], dtype=np.int32)
 
-        # ---- Critical nodes (high-value servers) ----
-        self.critical_nodes = {2,4}
+        # ==================================================
+        # CRITICAL NODES
+        # ==================================================
+        self.critical_nodes = {0,1,2}
 
-        # ---- Gym spaces ----
+        # ==================================================
+        # NODE TYPES
+        # ==================================================
+        self.node_types = {
+            0: "Workstation",
+            1: "Firewall",
+            2: "Database",
+            3: "Server",
+            4: "DomainController",
+            5: "Workstation"
+        }
+
+        # ==================================================
+        # REAL SERVICE MAPPING
+        # ==================================================
+        self.real_services = {
+            0: "Nginx",
+            1: "DVWA",
+            2: "MySQL"
+        }
+
+        # ==================================================
+        # SECURITY LEVELS
+        # ==================================================
+        self.security_levels = {
+            0: 0.4,
+            1: 0.9,
+            2: 0.8,
+            3: 0.7,
+            4: 0.95,
+            5: 0.5
+        }
+
+        # ==================================================
+        # CVSS SCORES
+        # ==================================================
+        self.cvss_scores = {
+            0: 8.5,
+            1: 9.5,
+            2: 9.2,
+            3: 7.8,
+            4: 9.8,
+            5: 4.5
+        }
+
+        # ==================================================
+        # ACTION SPACE
+        # ==================================================
         self.action_space = spaces.Discrete(self.node_count + 1)
 
         self.observation_space = spaces.Box(
@@ -41,10 +92,11 @@ class GraphCyberEnv(gym.Env):
 
         self.reset()
 
-    # --------------------------------------------------
+    # ======================================================
     # RESET
-    # --------------------------------------------------
+    # ======================================================
     def reset(self, seed=None, options=None):
+
         super().reset(seed=seed)
 
         self.state = np.zeros(self.node_count, dtype=np.float32)
@@ -54,56 +106,163 @@ class GraphCyberEnv(gym.Env):
         self.state[entry] = 1
 
         self.current_step = 0
+
+        # ==================================================
+        # REAL SERVICE DISCOVERY
+        # ==================================================
+        self.service_status = scan_local_services()
+
         return self.state.copy()
 
-    # --------------------------------------------------
+    # ======================================================
     # STEP
-    # --------------------------------------------------
+    # ======================================================
     def step(self, action):
+
         action = int(action)
-        
+
         self.current_step += 1
         reward = 0.0
 
-        # ---------- ATTACK ACTION ----------
+        # ==================================================
+        # ATTACKER ACTION
+        # ==================================================
         if action < self.node_count:
 
             compromised = np.where(self.state == 1)[0]
 
-            # check if reachable from compromised nodes
+            # lateral movement connectivity
             reachable = False
+
             for node in compromised:
                 if self.graph[node, action] == 1:
                     reachable = True
                     break
 
-            if reachable and self.state[action] == 0:
-                self.state[action] = 1
-                reward = 1.0
+            # ==================================================
+            # CHECK REAL SERVICE AVAILABILITY
+            # ==================================================
+            service_available = True
 
-                # bonus for critical nodes
-                if action in self.critical_nodes:
-                    reward += 1.0
+            if action in self.real_services:
+                service_name = self.real_services[action]
+                service_available = self.service_status.get(
+                    service_name,
+                    False
+                )
+
+            # ==================================================
+            # ATTACK ATTEMPT
+            # ==================================================
+            if (
+                reachable
+                and self.state[action] == 0
+                and service_available
+            ):
+
+                # CVSS-based compromise probability
+                success_prob = 0.2 + (
+                    self.cvss_scores[action] / 20
+                )
+
+                # exploration randomness
+                success_prob += np.random.uniform(-0.05, 0.05)
+
+                # valid probability bounds
+                success_prob = np.clip(
+                    success_prob,
+                    0.05,
+                    0.95
+                )
+
+                # successful compromise
+                if np.random.rand() < success_prob:
+
+                    self.state[action] = 1
+
+                    # base reward
+                    reward = 1.0
+
+                    # vulnerability severity reward
+
+                    # Real infrastructure bonus
+                    if action in self.real_services:
+                        reward += 4.0
+                    else:
+                        reward += 0.2
+                    # critical infrastructure bonus
+                    if action in self.critical_nodes:
+                        reward += 2.0
+                    # Penalize simulated-only nodes
+                    if action not in self.real_services:
+                        reward -= 2.5
+                else:
+                    reward = -0.5
 
             else:
                 reward = -0.3
 
-        # ---------- DEFENDER ACTION ----------
+        # ==================================================
+        # DEFENDER ACTION
+        # ==================================================
         else:
+
             compromised = np.where(self.state == 1)[0]
 
             if len(compromised) > 0:
-                node = np.random.choice(compromised)
-                self.state[node] = 0
-                reward = 0.6
+
+                # prioritize high-risk systems
+                node = max(
+                    compromised,
+                    key=lambda x: self.cvss_scores[x]
+                )
+
+                # probabilistic recovery
+                if np.random.rand() < 0.35:
+
+                    self.state[node] = 0
+                    reward = 0.8
+
+                else:
+                    reward = -0.2
+
             else:
                 reward = -0.1
 
+        # ==================================================
+        # TERMINATION
+        # ==================================================
         done = self.current_step >= self.max_steps
+
         return self.state.copy(), reward, done, {}
 
-    # --------------------------------------------------
+    # ======================================================
     # RENDER
-    # --------------------------------------------------
+    # ======================================================
     def render(self):
-        print(f"Step {self.current_step}: {self.state}")
+
+        print("\n==============================")
+        print(f"Step: {self.current_step}")
+
+        for i in range(self.node_count):
+
+            status = (
+                "COMPROMISED"
+                if self.state[i] == 1
+                else "SAFE"
+            )
+
+            service = self.real_services.get(
+                i,
+                "Simulated"
+            )
+
+            print(
+                f"Node {i} | "
+                f"{self.node_types[i]} | "
+                f"Service={service} | "
+                f"CVSS={self.cvss_scores[i]} | "
+                f"{status}"
+            )
+
+        print("==============================")

@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    ports:
+      - "8080:80"
+    restart: always
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: enterprise
+    ports:
+      - "3306:3306"
+    restart: always
+
+  flaskapp:
+    image: nginx:latest
+    container_name: flaskapp
+    ports:
+      - "5000:80"
+    restart: always
