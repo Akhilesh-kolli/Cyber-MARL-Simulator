@@ -1,0 +1,11 @@
+numpy<2.0.0
+gym==0.26.2
+stable-baselines3[extra]
+streamlit
+plotly
+pandas
+networkx
+matplotlib
+requests
+beautifulsoup4
+shimmy>=2.0

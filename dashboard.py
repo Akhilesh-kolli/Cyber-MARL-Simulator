@@ -1,3 +1,4 @@
+# SOC Dashboard v1.1.2 - Last Patch: 2026-05-19 13:40
 import plotly.express as px
 import pandas as pd
 import streamlit as st
@@ -82,9 +83,63 @@ if "simulation_started" not in st.session_state:
     st.session_state.simulation_started = False
 
 if "simulation_data" not in st.session_state:
-    st.session_state.simulation_data = {}
+    st.session_state.simulation_data = {
+        "risk_score": 0,
+        "incident_priority": "LOW",
+        "incident_status": "IDLE",
+        "threat_level": "LOW",
+        "ioc_ports": set(),
+        "ioc_techniques": set(),
+        "compromised_assets": set(),
+        "observed_attack_stages": set(),
+        "critical_alerts": 0,
+        "high_severity_events": 0,
+        "recon_events": 0,
+        "discovery_events": 0,
+        "lateral_movement_count": 0,
+        "attack_attempts": 0,
+        "successful_attacks": 0,
+        "successful_defenses": 0,
+        "failed_defenses": 0,
+        "defense_actions_count": 0,
+        "threat_momentum_score": 0,
+        "persistence_score": 0,
+        "threat_correlation_score": 0,
+        "containment_pressure_score": 0,
+        "threat_volatility_score": 0,
+        "anomaly_pressure_score": 0,
+        "soc_recommendation": "Awaiting Simulation",
+        "attacker_profile": "Unknown",
+        "campaign_type": "Unknown Campaign",
+        "timeline_data": [],
+        "structured_events": [],
+        "event_logs": [],
+        "step_history": [],
+        "threat_history": [],
+        "compromise_history": [],
+    }
 
 SIM_STATE = st.session_state.simulation_data
+
+# Robustness check: Ensure all required keys exist in session state
+required_defaults = {
+    "risk_score": 0, "incident_priority": "LOW", "incident_status": "IDLE",
+    "threat_level": "LOW", "ioc_ports": set(), "ioc_techniques": set(),
+    "compromised_assets": set(), "observed_attack_stages": set(),
+    "critical_alerts": 0, "high_severity_events": 0, "recon_events": 0,
+    "discovery_events": 0, "lateral_movement_count": 0, "attack_attempts": 0,
+    "successful_attacks": 0, "successful_defenses": 0, "failed_defenses": 0,
+    "defense_actions_count": 0, "threat_momentum_score": 0, "persistence_score": 0,
+    "threat_correlation_score": 0, "containment_pressure_score": 0,
+    "threat_volatility_score": 0, "anomaly_pressure_score": 0,
+    "soc_recommendation": "Awaiting Simulation", "attacker_profile": "Unknown",
+    "campaign_type": "Unknown Campaign", "timeline_data": [],
+    "structured_events": [], "event_logs": [], "step_history": [],
+    "threat_history": [], "compromise_history": [],
+}
+for key, default in required_defaults.items():
+    if key not in SIM_STATE:
+        SIM_STATE[key] = default
 with top1:
 
     monitor_status = (
@@ -138,14 +193,23 @@ else:
     compromised_nodes = str(len(SIM_STATE["compromise_history"]))
     compromised_delta = "Hosts Impacted"
 
-    defense_success = f"{defense_effectiveness:.1f}%"
+    # Calculate derived stats from persistent session state
+    if SIM_STATE["defense_actions_count"] > 0:
+        def_eff = (SIM_STATE["successful_defenses"] / SIM_STATE["defense_actions_count"]) * 100
+    else:
+        def_eff = 0
+
+    defense_success = f"{def_eff:.1f}%"
     defense_delta = "Active Defense"
 
-    if risk_score >= 80:
+    current_risk = SIM_STATE["risk_score"]
+    current_comp = len(SIM_STATE["compromised_assets"])
+
+    if current_risk >= 80:
         incident_status = "ACTIVE INCIDENT"
         incident_delta = "SOC Escalated"
 
-    elif compromised_count >= 5:
+    elif current_comp >= 5:
         incident_status = "BREACH CONFIRMED"
         incident_delta = "Critical Response"
 
@@ -333,7 +397,11 @@ attacker, defender = load_models()
 # --------------------------------------------------
 # DVWA SESSION INITIALIZATION
 # --------------------------------------------------
-dvwa_logged_in = login_dvwa()
+try:
+    dvwa_logged_in = login_dvwa()
+except Exception as e:
+    print(f"Global DVWA initialization error: {e}")
+    dvwa_logged_in = False
 
 # --------------------------------------------------
 # ENVIRONMENT
@@ -342,9 +410,9 @@ env = GraphCyberEnv()
 real_ports = {
     0: 5000,   # Nginx
     1: 8080,   # DVWA
-    2: 3306    # MySQL
+    2: 3307    # MySQL
 }
-obs = env.reset()
+obs, _ = env.reset()
 
 # --------------------------------------------------
 # BUILD GRAPH
@@ -612,7 +680,7 @@ ioc1, ioc2 = st.columns(2)
 ioc_ports_placeholder = ioc1.empty()
 ioc_tech_placeholder  = ioc2.empty()
 
-if SIM_STATE["ioc_ports"]:
+if SIM_STATE.get("ioc_ports"):
     ioc_ports_placeholder.code(
         ", ".join(sorted(SIM_STATE["ioc_ports"])),
         language="text"
@@ -623,7 +691,7 @@ else:
         language="text"
     )
 
-if SIM_STATE["ioc_techniques"]:
+if SIM_STATE.get("ioc_techniques"):
     ioc_tech_placeholder.code(
         ", ".join(sorted(SIM_STATE["ioc_techniques"])),
         language="text"
@@ -760,7 +828,7 @@ if run_button:
                 action = np.random.choice(reachable_nodes)
 
         previous_compromised = int(np.sum(obs))
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, truncated, _ = env.step(action)
         current_compromised  = int(np.sum(obs))
         compromised_count    = current_compromised
 
@@ -851,7 +919,7 @@ if run_button:
                         if sqli_result.get("possible_sqli"):
                             attack_result["vulnerability"] = "SQL Injection Detected"
 
-                elif port == 3306:
+                elif port == 3307:
                     attack_result = probe_tcp_service(port)
 
             # --------------------------------------

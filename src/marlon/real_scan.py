@@ -1,29 +1,26 @@
-import subprocess
+import socket
 
+def probe_port(host, port):
+    """
+    Check if a port is open on a host.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            return s.connect_ex((host, port)) == 0
+    except Exception:
+        return False
 
 def scan_local_services():
     """
-    Scan localhost for active cyber-range services.
+    Scan localhost for active cyber-range services using native sockets.
     """
 
-    result = subprocess.check_output(
-        ["nmap", "-p", "5000,8080,3306", "localhost"]
-    ).decode()
-
     services = {
-        "DVWA": False,
-        "MySQL": False,
-        "Nginx": False
+        "DVWA": probe_port("localhost", 8080),
+        "MySQL": probe_port("localhost", 3307),
+        "Nginx": probe_port("localhost", 5000)
     }
-
-    if "8080/tcp open" in result:
-        services["DVWA"] = True
-
-    if "3306/tcp open" in result:
-        services["MySQL"] = True
-
-    if "5000/tcp open" in result:
-        services["Nginx"] = True
 
     return services
 

@@ -53,7 +53,7 @@ if __name__ == "__main__":
     print(probe_http_service(8080))
 
     print("\nMySQL Probe")
-    print(probe_tcp_service(3306))
+    print(probe_tcp_service(3307))
 
     print("\nNginx Probe")
     print(probe_http_service(5000))

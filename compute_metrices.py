@@ -14,7 +14,7 @@ from marlon.graph_env import GraphCyberEnv
 # --------------------------------------------------
 def run_episode(env, attacker, defender):
 
-    obs = env.reset()
+    obs, _ = env.reset()
     done = False
 
     total_reward = 0
@@ -24,7 +24,7 @@ def run_episode(env, attacker, defender):
 
         # ---- attacker step ----
         action, _ = attacker.predict(obs, deterministic=True)
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, truncated, _ = env.step(action)
 
         total_reward += reward
         steps += 1

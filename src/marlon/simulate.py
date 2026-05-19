@@ -14,14 +14,14 @@ def simulate(timesteps, attacker_option, defender_option, attacker_file=None, de
     defender = PPO.load("models/ppo_defender_dummy", env=env)
 
     logs = []
-    state = env.reset()
+    state, _ = env.reset()
     done = False
     step = 0
 
     while not done:
         # Attacker turn
         a_action, _ = attacker.predict(state, deterministic=True)
-        state, a_reward, done, _ = env.step(a_action)
+        state, a_reward, done, truncated, _ = env.step(a_action)
 
         logs.append({
             "step": step,
@@ -36,7 +36,7 @@ def simulate(timesteps, attacker_option, defender_option, attacker_file=None, de
 
         # Defender turn
         d_action = env.node_count
-        state, d_reward, done, _ = env.step(d_action)
+        state, d_reward, done, truncated, _ = env.step(d_action)
 
         logs.append({
             "step": step,

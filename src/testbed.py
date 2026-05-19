@@ -35,13 +35,13 @@ def main():
     episode_rewards = []
 
     for episode in range(20):
-        obs = env.reset()
+        obs, _ = env.reset()
         done = False
         total_reward = 0.0
 
         while not done:
             action, _ = model.predict(obs)
-            obs, reward, done, _ = env.step(action)
+            obs, reward, done, truncated, _ = env.step(action)
             total_reward += reward
 
         episode_rewards.append(total_reward)

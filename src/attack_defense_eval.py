@@ -26,7 +26,7 @@ def main():
     attacker = PPO.load(str(attacker_path), env=env)
     defender = PPO.load(str(defender_path), env=env)
 
-    state = env.reset()
+    state, _ = env.reset()
     done = False
     step = 0
 
@@ -34,7 +34,7 @@ def main():
 
         # ---------- ATTACKER ----------
         a_action, _ = attacker.predict(state, deterministic=False)
-        state, reward, done, _ = env.step(int(a_action))
+        state, reward, done, truncated, _ = env.step(int(a_action))
 
         print(f"[Step {step}] Attacker -> Node {a_action} | Reward {reward:.2f} | State {state}")
 
@@ -43,7 +43,7 @@ def main():
 
         # ---------- DEFENDER ----------
         d_action, _ = defender.predict(state, deterministic=False)
-        state, reward, done, _ = env.step(int(d_action))
+        state, reward, done, truncated, _ = env.step(int(d_action))
 
         print(f"[Step {step}] Defender -> Action {d_action} | Reward {reward:.2f} | State {state}")
 

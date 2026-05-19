@@ -31,13 +31,13 @@ def main():
                 G.add_edge(i, j)
 
     # run one episode
-    obs = env.reset()
+    obs, _ = env.reset()
     done = False
 
     while not done:
 
         action, _ = attacker.predict(obs, deterministic=True)
-        obs, _, done, _ = env.step(action)
+        obs, _, done, truncated, _ = env.step(action)
 
         if done:
             break

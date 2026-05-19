@@ -19,7 +19,7 @@ def main():
 
     env = GraphCyberEnv()
 
-    obs = env.reset()
+    obs, _ = env.reset()
     done = False
 
     compromised_counts = []
@@ -31,7 +31,7 @@ def main():
 
         # attacker move
         action, _ = attacker.predict(obs, deterministic=True)
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, truncated, _ = env.step(action)
 
         compromised_counts.append(np.sum(obs))
         steps.append(step)

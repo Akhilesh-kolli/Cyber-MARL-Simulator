@@ -112,7 +112,7 @@ class GraphCyberEnv(gym.Env):
         # ==================================================
         self.service_status = scan_local_services()
 
-        return self.state.copy()
+        return self.state.copy(), {}
 
     # ======================================================
     # STEP
@@ -234,7 +234,7 @@ class GraphCyberEnv(gym.Env):
         # ==================================================
         done = self.current_step >= self.max_steps
 
-        return self.state.copy(), reward, done, {}
+        return self.state.copy(), reward, done, False, {}
 
     # ======================================================
     # RENDER

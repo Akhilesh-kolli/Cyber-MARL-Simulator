@@ -33,11 +33,11 @@ class DummyCyberEnv(gym.Env):
         self.state = np.zeros(self.node_count, dtype=np.float32)
         self.current_step = 0
 
-    # SB3 expects ONLY observation returned here
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         self.state = np.zeros(self.node_count, dtype=np.float32)
         self.current_step = 0
-        return self.state.copy()
+        return self.state.copy(), {}
 
     def step(self, action):
 
@@ -69,7 +69,7 @@ class DummyCyberEnv(gym.Env):
 
         done = self.current_step >= self.max_steps
 
-        return self.state.copy(), reward, done, {}
+        return self.state.copy(), reward, done, False, {}
 
     def render(self, mode="human"):
         print(f"Step {self.current_step}: {self.state}")

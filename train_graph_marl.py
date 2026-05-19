@@ -13,6 +13,7 @@ from marlon.graph_env import GraphCyberEnv
 # CREATE ENVIRONMENT
 # --------------------------------------------------
 env = GraphCyberEnv()
+obs, _ = env.reset()
 
 # --------------------------------------------------
 # ATTACKER MODEL

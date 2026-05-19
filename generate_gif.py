@@ -50,7 +50,7 @@ def main():
     pos = nx.spring_layout(G, seed=42)
 
     # ---- simulate episode ----
-    obs = env.reset()
+    obs, _ = env.reset()
     done = False
 
     frames = []
@@ -69,7 +69,7 @@ def main():
 
         # attacker
         action, _ = attacker.predict(obs, deterministic=True)
-        obs, _, done, _ = env.step(action)
+        obs, _, done, truncated, _ = env.step(action)
         if done:
             break
 

@@ -24,7 +24,7 @@ SIMULATION_NODES = {
 # --------------------------------------------------
 REAL_SERVICES = {
     "DVWA":  {"port": 8080, "protocol": "HTTP"},
-    "MySQL": {"port": 3306, "protocol": "TCP"},
+    "MySQL": {"port": 3307, "protocol": "TCP"},
     "Nginx": {"port": 5000, "protocol": "HTTP"},
 }
 
