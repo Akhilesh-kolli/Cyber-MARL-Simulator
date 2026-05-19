@@ -1,0 +1,141 @@
+"""
+risk_engine.py
+--------------
+All risk scoring, incident priority, dwell time,
+attacker profiling, and SOC recommendation logic.
+
+Reads from structured event dicts — no string parsing.
+"""
+
+# --------------------------------------------------
+# RISK WEIGHTS
+# --------------------------------------------------
+RISK_WEIGHTS = {
+    "critical_alert":    15,
+    "high_severity":     10,
+    "compromised_node":  12,
+    "successful_attack":  8,
+}
+
+# CVSS contributes directly to risk when available
+CVSS_RISK_MULTIPLIER = 1
+
+
+def calculate_risk_score(
+    critical_alerts,
+    high_severity_events,
+    compromised_count,
+    successful_attacks,
+    events=None,
+):
+    """
+    Compute composite risk score.
+    Optionally uses CVSS scores from event dicts for higher accuracy.
+    """
+    base = (
+        critical_alerts      * RISK_WEIGHTS["critical_alert"]
+        + high_severity_events * RISK_WEIGHTS["high_severity"]
+        + compromised_count    * RISK_WEIGHTS["compromised_node"]
+        + successful_attacks   * RISK_WEIGHTS["successful_attack"]
+    )
+
+    # Add CVSS-weighted bonus if event data available
+    cvss_bonus = 0
+    if events:
+        for e in events:
+            cvss = e.get("cvss")
+            if cvss and isinstance(cvss, (int, float)):
+                if e.get("status") == "success":
+                    cvss_bonus += cvss * CVSS_RISK_MULTIPLIER
+
+    return int(base + cvss_bonus)
+
+
+def get_incident_priority(risk_score):
+    """P1 is highest severity."""
+    if risk_score >= 150:
+        return "P1"
+    elif risk_score >= 100:
+        return "P2"
+    elif risk_score >= 50:
+        return "P3"
+    else:
+        return "P4"
+
+
+def get_incident_status(risk_score, compromised_count):
+    if compromised_count >= 5:
+        return "BREACH CONFIRMED"
+    if risk_score >= 80:
+        return "ACTIVE INCIDENT"
+    return "MONITORING"
+
+
+def get_threat_level(compromised_count, technique=None, cvss=None):
+    """
+    Multi-factor threat level.
+    Uses node count as primary signal,
+    CVSS and technique as secondary signals.
+    """
+    if compromised_count >= 4:
+        return "CRITICAL"
+    if compromised_count >= 3:
+        # Escalate to CRITICAL if high CVSS
+        if cvss and cvss >= 9.0:
+            return "CRITICAL"
+        return "HIGH"
+    if compromised_count >= 2:
+        return "MEDIUM"
+    # Use technique severity for single-node events
+    from event_engine import ATTACK_SEVERITY
+    if technique and technique in ATTACK_SEVERITY:
+        return ATTACK_SEVERITY[technique]
+    return "LOW"
+
+
+def get_attacker_profile(risk_score, lateral_movement_count):
+    if lateral_movement_count >= 3 or risk_score >= 100:
+        return "Advanced Persistent Threat"
+    if risk_score >= 50:
+        return "Organized Threat Actor"
+    return "Script Kiddie"
+
+
+def get_soc_recommendation(incident_priority):
+    mapping = {
+        "P1": "Initiate Enterprise Incident Response",
+        "P2": "Escalate To SOC Tier-2",
+        "P3": "Perform Threat Hunt",
+        "P4": "Continue Monitoring",
+    }
+    return mapping.get(incident_priority, "Continue Monitoring")
+
+
+def get_dwell_time(compromised_count):
+    """Estimated dwell time in minutes."""
+    return compromised_count * 12
+
+
+def get_alert_fatigue_score(critical_alerts, step):
+    if step <= 0:
+        return 0.0
+    return round(critical_alerts / max(step, 1), 2)
+
+
+def get_attack_success_rate(successful_attacks, attack_attempts):
+    if attack_attempts <= 0:
+        return 0.0
+    return round((successful_attacks / attack_attempts) * 100, 1)
+
+
+def get_defense_effectiveness(successful_defenses, defense_actions):
+    if defense_actions <= 0:
+        return 0.0
+    return round((successful_defenses / defense_actions) * 100, 1)
+
+
+def get_dominant_technique(technique_counts):
+    """Return the most frequent valid technique."""
+    if not technique_counts or not any(technique_counts.values()):
+        return "N/A"
+    return max(technique_counts, key=technique_counts.get)

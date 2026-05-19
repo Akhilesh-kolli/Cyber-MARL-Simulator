@@ -1,0 +1,1539 @@
+/* =========================================================
+   CYBER MARL SOC PLATFORM — UX 1.1 FOUNDATION THEME
+   ========================================================= */
+
+/* -------------------------------
+   GLOBAL APP
+-------------------------------- */
+
+html,
+body,
+[data-testid="stAppViewContainer"] {
+    background-color: #0b1220;
+    color: #e5e7eb;
+    font-family: "Inter", sans-serif;
+}
+
+/* Main app spacing */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 100%;
+}
+
+/* -------------------------------
+   TYPOGRAPHY
+-------------------------------- */
+
+h1, h2, h3, h4 {
+    color: #f3f4f6;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+h1 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.8rem;
+}
+
+h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Paragraphs */
+p,
+label,
+span,
+div {
+    color: #d1d5db;
+}
+
+/* -------------------------------
+   SIDEBAR
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+    background-color: #111827;
+    border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+[data-testid="stSidebar"] * {
+    color: #e5e7eb;
+}
+
+/* -------------------------------
+   CARDS / PANELS
+-------------------------------- */
+
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"],
+div.stDataFrame,
+div.element-container {
+
+    background: rgba(17, 24, 39, 0.88);
+
+    border: 1px solid rgba(255,255,255,0.06);
+
+    border-radius: 14px;
+
+    padding: 1rem;
+
+    margin-bottom: 1rem;
+}
+
+/* -------------------------------
+   METRICS
+-------------------------------- */
+
+[data-testid="stMetricLabel"] {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+[data-testid="stMetricValue"] {
+    color: #f9fafb;
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+/* -------------------------------
+   BUTTONS
+-------------------------------- */
+
+.stButton > button {
+
+    background-color: #2563eb;
+
+    color: white;
+
+    border: none;
+
+    border-radius: 10px;
+
+    padding: 0.5rem 1rem;
+
+    font-weight: 600;
+
+    transition: 0.2s ease;
+}
+
+.stButton > button:hover {
+    background-color: #1d4ed8;
+}
+
+/* -------------------------------
+   TABLES
+-------------------------------- */
+
+thead tr th {
+    background-color: #111827 !important;
+    color: #f3f4f6 !important;
+}
+
+tbody tr td {
+    color: #d1d5db !important;
+}
+
+/* -------------------------------
+   PLOTLY CHARTS
+-------------------------------- */
+
+.js-plotly-plot {
+    border-radius: 12px;
+}
+
+/* -------------------------------
+   SCROLLBAR
+-------------------------------- */
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #111827;
+}
+
+/* existing CSS above */
+
+
+/* IOC text readability */
+
+pre,
+code,
+pre span,
+code span {
+
+    color: #4b5563 !important;
+
+    font-weight: 600 !important;
+}
+
+
+/* Remove top white Streamlit header */
+
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+[data-testid="stToolbar"] {
+    right: 1rem;
+}
+
+/* --------------------------------
+   STREAMLIT TOP TOOLBAR CLEANUP
+-------------------------------- */
+
+/* Toolbar container */
+
+[data-testid="stToolbar"] {
+
+    background: rgba(15, 23, 42, 0.92) !important;
+
+    border: 1px solid rgba(255,255,255,0.06);
+
+    border-radius: 12px;
+
+    padding: 0.25rem 0.6rem;
+
+    top: 0.6rem !important;
+
+    right: 1rem !important;
+
+    backdrop-filter: blur(8px);
+}
+
+/* Deploy + menu text/icons */
+
+[data-testid="stToolbar"] * {
+
+    color: #d1d5db !important;
+
+    opacity: 1 !important;
+}
+
+/* Make stop/running icon visible */
+
+[data-testid="stStatusWidget"] {
+
+    color: #f3f4f6 !important;
+
+    opacity: 1 !important;
+}
+
+/* =========================================================
+   UX-1.2 — ENTERPRISE COLOR ARCHITECTURE
+   ========================================================= */
+
+/* -------------------------------
+   SECTION HEADINGS
+-------------------------------- */
+
+h1 {
+    color: #f8fafc;
+}
+
+h2 {
+    color: #e2e8f0;
+}
+
+h3 {
+    color: #cbd5e1;
+}
+
+/* -------------------------------
+   PANEL ACCENT HIERARCHY
+-------------------------------- */
+
+/* Threat Hunt */
+
+section:has(h2:contains("Threat Hunt")) {
+
+    border-left: 3px solid #facc15;
+}
+
+/* IOC Intelligence */
+
+section:has(h2:contains("IOC")) {
+
+    border-left: 3px solid #38bdf8;
+}
+
+/* Executive Summary */
+
+section:has(h2:contains("Executive")) {
+
+    border-left: 3px solid #a78bfa;
+}
+
+/* Timeline */
+
+section:has(h2:contains("Timeline")) {
+
+    border-left: 3px solid #34d399;
+}
+
+/* -------------------------------
+   BUTTON HARMONY
+-------------------------------- */
+
+.stButton > button {
+
+    background: linear-gradient(
+        135deg,
+        #2563eb,
+        #1d4ed8
+    );
+
+    box-shadow:
+        0 0 12px rgba(37, 99, 235, 0.25);
+}
+
+/* -------------------------------
+   SIDEBAR STATUS PANELS
+-------------------------------- */
+
+[data-testid="stSidebar"] .element-container {
+
+    background: rgba(17, 24, 39, 0.92);
+
+    border: 1px solid rgba(255,255,255,0.05);
+
+    border-radius: 14px;
+}
+
+/* -------------------------------
+   METRIC VISUAL EMPHASIS
+-------------------------------- */
+
+[data-testid="stMetric"] {
+
+    border-top: 2px solid rgba(59,130,246,0.45);
+}
+
+/* -------------------------------
+   SEVERITY COLORS
+-------------------------------- */
+
+.low-severity {
+    color: #22c55e;
+}
+
+.medium-severity {
+    color: #f59e0b;
+}
+
+.high-severity {
+    color: #ef4444;
+}
+
+.critical-severity {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* -------------------------------
+   ALERT / INFO PANELS
+-------------------------------- */
+
+.stAlert {
+
+    border-radius: 12px !important;
+
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* -------------------------------
+   SOC VISUAL BALANCE
+-------------------------------- */
+
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"] {
+
+    transition: 0.2s ease;
+}
+
+div[data-testid="stMetric"]:hover,
+div[data-testid="stPlotlyChart"]:hover {
+
+    border-color: rgba(59,130,246,0.35);
+}
+
+/* =========================================================
+   UX-1.3 — GLASSMORPHISM + CARD SYSTEM
+   ========================================================= */
+
+/* -------------------------------
+   MAIN SECTION CONTAINERS
+-------------------------------- */
+
+div.element-container {
+
+    border-radius: 16px;
+
+    backdrop-filter: blur(10px);
+
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* -------------------------------
+   PRIMARY SOC PANELS
+-------------------------------- */
+
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"],
+div.stDataFrame {
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(15, 23, 42, 0.92),
+            rgba(15, 23, 42, 0.82)
+        );
+
+    border:
+        1px solid rgba(255,255,255,0.07);
+
+    box-shadow:
+        0 4px 18px rgba(0,0,0,0.22);
+
+    border-radius: 16px;
+
+    backdrop-filter: blur(10px);
+
+    -webkit-backdrop-filter: blur(10px);
+
+    transition:
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+/* -------------------------------
+   SUBTLE HOVER FEEDBACK
+-------------------------------- */
+
+div[data-testid="stMetric"]:hover,
+div[data-testid="stPlotlyChart"]:hover,
+div.stDataFrame:hover {
+
+    border-color:
+        rgba(59,130,246,0.22);
+
+    transform:
+        translateY(-1px);
+}
+
+/* -------------------------------
+   SECTION DEPTH
+-------------------------------- */
+
+section.main > div {
+
+    position: relative;
+}
+
+/* -------------------------------
+   BUTTON REFINEMENT
+-------------------------------- */
+
+.stButton > button {
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 2px 10px rgba(37,99,235,0.18);
+
+    letter-spacing: 0.2px;
+}
+
+/* -------------------------------
+   SIDEBAR DEPTH
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+
+    box-shadow:
+        inset -1px 0 0 rgba(255,255,255,0.04);
+}
+
+/* -------------------------------
+   SOFT PANEL GLOW
+-------------------------------- */
+
+div[data-testid="stMetric"]::before,
+div[data-testid="stPlotlyChart"]::before {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 0;
+
+    border-radius: 16px;
+
+    pointer-events: none;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,0.02),
+            rgba(255,255,255,0)
+        );
+}
+/* =========================================================
+   UX-1.4 — RESPONSIVE GRID + LAYOUT CLEANUP
+   ========================================================= */
+
+/* -------------------------------
+   MAIN CONTENT WIDTH
+-------------------------------- */
+
+.block-container {
+
+    max-width: 100% !important;
+
+    padding-top: 1.2rem;
+
+    padding-bottom: 2rem;
+
+    padding-left: 2rem;
+
+    padding-right: 2rem;
+}
+
+/* -------------------------------
+   SECTION RHYTHM
+-------------------------------- */
+
+section.main > div {
+
+    gap: 1rem;
+}
+
+/* -------------------------------
+   BETTER PANEL SPACING
+-------------------------------- */
+
+div.element-container {
+
+    margin-bottom: 0.7rem;
+}
+
+/* -------------------------------
+   RESPONSIVE METRIC GRIDS
+-------------------------------- */
+
+[data-testid="stHorizontalBlock"] {
+
+    gap: 1rem !important;
+
+    align-items: stretch !important;
+}
+
+/* -------------------------------
+   CLEAN KPI PROPORTIONS
+-------------------------------- */
+
+div[data-testid="stMetric"] {
+
+    min-height: 110px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+}
+
+/* -------------------------------
+   RESPONSIVE SIDEBAR
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+
+    min-width: 300px;
+
+    max-width: 320px;
+}
+
+/* -------------------------------
+   WIDESCREEN BALANCE
+-------------------------------- */
+
+@media screen and (min-width: 1600px) {
+
+    .block-container {
+
+        padding-left: 3rem;
+
+        padding-right: 3rem;
+    }
+}
+
+/* -------------------------------
+   LAPTOP OPTIMIZATION
+-------------------------------- */
+
+@media screen and (max-width: 1200px) {
+
+    .block-container {
+
+        padding-left: 1.2rem;
+
+        padding-right: 1.2rem;
+    }
+
+    h1 {
+
+        font-size: 1.8rem;
+    }
+}
+
+/* -------------------------------
+   CLEAN SECTION FLOW
+-------------------------------- */
+
+h2 {
+
+    margin-top: 1.2rem;
+
+    margin-bottom: 0.8rem;
+}
+
+/* -------------------------------
+   CHART CONTAINER BALANCE
+-------------------------------- */
+
+div[data-testid="stPlotlyChart"] {
+
+    padding-top: 0.5rem;
+}
+
+/* -------------------------------
+   REMOVE EXCESS EMPTY GAPS
+-------------------------------- */
+
+div[data-testid="stVerticalBlock"] > div:empty {
+
+    display: none;
+}
+/* =========================================================
+   UX-1.5 — TYPOGRAPHY REFINEMENT
+   ========================================================= */
+
+/* -------------------------------
+   GLOBAL TYPOGRAPHY
+-------------------------------- */
+
+html,
+body,
+[class*="css"] {
+
+    font-family:
+        "Inter",
+        "Segoe UI",
+        sans-serif;
+}
+
+/* -------------------------------
+   MAIN TITLE
+-------------------------------- */
+
+h1 {
+
+    font-size: 2.6rem;
+
+    font-weight: 800;
+
+    letter-spacing: -0.5px;
+
+    line-height: 1.15;
+
+    color: #f8fafc;
+}
+
+/* -------------------------------
+   SECTION HEADINGS
+-------------------------------- */
+
+h2 {
+
+    font-size: 1.9rem;
+
+    font-weight: 700;
+
+    letter-spacing: -0.3px;
+
+    color: #e5e7eb;
+}
+
+/* -------------------------------
+   SUBSECTION HEADINGS
+-------------------------------- */
+
+h3 {
+
+    font-size: 1.25rem;
+
+    font-weight: 650;
+
+    color: #d1d5db;
+}
+
+/* -------------------------------
+   BODY TEXT
+-------------------------------- */
+
+p,
+label,
+span,
+div {
+
+    line-height: 1.55;
+}
+
+/* -------------------------------
+   METRIC LABELS
+-------------------------------- */
+
+[data-testid="stMetricLabel"] {
+
+    font-size: 0.9rem !important;
+
+    font-weight: 600 !important;
+
+    letter-spacing: 0.3px !important;
+
+    color: #94a3b8 !important;
+
+    text-transform: uppercase;
+}
+
+/* -------------------------------
+   METRIC VALUES
+-------------------------------- */
+
+[data-testid="stMetricValue"] {
+
+    font-size: 2rem !important;
+
+    font-weight: 800 !important;
+
+    letter-spacing: -0.5px !important;
+
+    color: #f8fafc !important;
+}
+
+/* -------------------------------
+   BUTTON TEXT
+-------------------------------- */
+
+.stButton > button {
+
+    font-size: 0.95rem;
+
+    font-weight: 600;
+
+    letter-spacing: 0.2px;
+}
+
+/* -------------------------------
+   SIDEBAR TEXT
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+
+    font-size: 0.95rem;
+}
+
+/* -------------------------------
+   CODE / IOC TEXT
+-------------------------------- */
+
+pre,
+code {
+
+    font-size: 0.92rem !important;
+
+    line-height: 1.45 !important;
+
+    font-weight: 600 !important;
+}
+
+/* -------------------------------
+   ALERT TEXT
+-------------------------------- */
+
+.stAlert {
+
+    font-size: 0.94rem;
+}
+
+/* -------------------------------
+   EXECUTIVE READABILITY
+-------------------------------- */
+
+strong,
+b {
+
+    color: #ffffff;
+}
+
+/* -------------------------------
+   LIVE EVENT FEED
+-------------------------------- */
+
+textarea,
+pre {
+
+    letter-spacing: 0.15px;
+}
+
+/* -------------------------------
+   IMPROVED TEXT RENDERING
+-------------------------------- */
+
+body {
+
+    -webkit-font-smoothing: antialiased;
+
+    -moz-osx-font-smoothing: grayscale;
+
+    text-rendering: optimizeLegibility;
+}
+/* =========================================================
+   UX-1.6 — KPI VISUAL NORMALIZATION
+   ========================================================= */
+
+/* -------------------------------
+   KPI CARD BASE
+-------------------------------- */
+
+div[data-testid="stMetric"] {
+
+    padding: 1rem 1.1rem;
+
+    border-radius: 18px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(15, 23, 42, 0.94),
+            rgba(15, 23, 42, 0.86)
+        );
+
+    border:
+        1px solid rgba(255,255,255,0.06);
+
+    box-shadow:
+        0 4px 18px rgba(0,0,0,0.22);
+
+    transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+/* -------------------------------
+   KPI HOVER
+-------------------------------- */
+
+div[data-testid="stMetric"]:hover {
+
+    transform:
+        translateY(-2px);
+
+    border-color:
+        rgba(59,130,246,0.28);
+
+    box-shadow:
+        0 8px 22px rgba(0,0,0,0.28);
+}
+
+/* -------------------------------
+   KPI LABELS
+-------------------------------- */
+
+[data-testid="stMetricLabel"] {
+
+    opacity: 0.88;
+
+    margin-bottom: 0.35rem;
+}
+
+/* -------------------------------
+   KPI VALUES
+-------------------------------- */
+
+[data-testid="stMetricValue"] {
+
+    line-height: 1.05 !important;
+}
+
+/* -------------------------------
+   CRITICAL KPI ACCENT
+-------------------------------- */
+
+div[data-testid="stMetric"] {
+
+    position: relative;
+
+    overflow: hidden;
+}
+
+div[data-testid="stMetric"]::after {
+
+    content: "";
+
+    position: absolute;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 2px;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(59,130,246,0.0),
+            rgba(59,130,246,0.45),
+            rgba(59,130,246,0.0)
+        );
+}
+
+/* -------------------------------
+   SOC OVERVIEW EMPHASIS
+-------------------------------- */
+
+div[data-testid="stMetricValue"] {
+
+    text-shadow:
+        0 0 12px rgba(255,255,255,0.03);
+}
+
+/* -------------------------------
+   METRIC GRID BALANCE
+-------------------------------- */
+
+[data-testid="stHorizontalBlock"] > div {
+
+    height: 100%;
+}
+
+/* -------------------------------
+   EXECUTIVE CARD FEEL
+-------------------------------- */
+
+div[data-testid="stMetric"] {
+
+    backdrop-filter: blur(8px);
+
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* -------------------------------
+   KPI SECTION SPACING
+-------------------------------- */
+
+div[data-testid="stMetric"] label {
+
+    margin-bottom: 0.2rem !important;
+}
+
+/* -------------------------------
+   RESPONSIVE KPI SCALE
+-------------------------------- */
+
+@media screen and (max-width: 1200px) {
+
+    [data-testid="stMetricValue"] {
+
+        font-size: 1.7rem !important;
+    }
+}
+
+/* -------------------------------
+   CLEAN KPI ALIGNMENT
+-------------------------------- */
+
+div[data-testid="metric-container"] {
+
+    justify-content: center;
+}
+/* =========================================================
+   UX-1.7 — SIDEBAR OPERATIONAL CLEANUP
+   ========================================================= */
+
+/* -------------------------------
+   SIDEBAR BASE
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(2, 6, 23, 0.98),
+            rgba(15, 23, 42, 0.98)
+        );
+
+    border-right:
+        1px solid rgba(255,255,255,0.05);
+}
+
+/* -------------------------------
+   SIDEBAR CONTENT SPACING
+-------------------------------- */
+
+[data-testid="stSidebar"] .block-container {
+
+    padding-top: 1.5rem;
+
+    padding-left: 1rem;
+
+    padding-right: 1rem;
+}
+
+/* -------------------------------
+   SIDEBAR SECTION CARDS
+-------------------------------- */
+
+[data-testid="stSidebar"] .element-container {
+
+    background:
+        rgba(15, 23, 42, 0.72);
+
+    border:
+        1px solid rgba(255,255,255,0.05);
+
+    border-radius: 16px;
+
+    padding: 0.8rem;
+
+    margin-bottom: 1rem;
+
+    box-shadow:
+        0 2px 12px rgba(0,0,0,0.18);
+}
+
+/* -------------------------------
+   SIDEBAR HEADINGS
+-------------------------------- */
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+
+    color: #f1f5f9;
+
+    font-weight: 700;
+}
+
+/* -------------------------------
+   SLIDER CLEANUP
+-------------------------------- */
+
+.stSlider {
+
+    padding-top: 0.4rem;
+}
+
+/* -------------------------------
+   SLIDER TRACK
+-------------------------------- */
+
+.stSlider [data-baseweb="slider"] {
+
+    padding-left: 0.3rem;
+
+    padding-right: 0.3rem;
+}
+
+/* -------------------------------
+   BUTTON NORMALIZATION
+-------------------------------- */
+
+[data-testid="stSidebar"] .stButton > button {
+
+    width: 100%;
+
+    min-height: 44px;
+
+    border-radius: 12px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.2px;
+}
+
+/* -------------------------------
+   SIDEBAR LABELS
+-------------------------------- */
+
+[data-testid="stSidebar"] label {
+
+    color: #cbd5e1;
+
+    font-size: 0.9rem;
+
+    font-weight: 600;
+}
+
+/* -------------------------------
+   STATUS PANELS
+-------------------------------- */
+
+[data-testid="stSidebar"] .stAlert {
+
+    border-radius: 14px;
+
+    border:
+        1px solid rgba(255,255,255,0.04);
+}
+
+/* -------------------------------
+   OPERATIONAL VISUAL BALANCE
+-------------------------------- */
+
+[data-testid="stSidebar"] hr {
+
+    border-color:
+        rgba(255,255,255,0.04);
+}
+
+/* -------------------------------
+   SIDEBAR HOVER POLISH
+-------------------------------- */
+
+[data-testid="stSidebar"] .element-container:hover {
+
+    border-color:
+        rgba(59,130,246,0.16);
+
+    transition:
+        border-color 0.2s ease;
+}
+
+/* -------------------------------
+   RESPONSIVE SIDEBAR
+-------------------------------- */
+
+@media screen and (max-width: 1200px) {
+
+    [data-testid="stSidebar"] {
+
+        min-width: 280px;
+    }
+}
+
+/* =========================================================
+   UX-1.8 — FINAL FOUNDATION POLISH
+   ========================================================= */
+
+/* -------------------------------
+   GLOBAL TRANSITION SMOOTHING
+-------------------------------- */
+
+* {
+
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+/* -------------------------------
+   CLEAN PANEL EDGES
+-------------------------------- */
+
+div.element-container,
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"],
+.stDataFrame {
+
+    overflow: hidden;
+}
+
+/* -------------------------------
+   PANEL VISUAL CONSISTENCY
+-------------------------------- */
+
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"],
+.stDataFrame,
+.stAlert {
+
+    border-radius: 16px;
+}
+
+/* -------------------------------
+   HOVER STABILITY
+-------------------------------- */
+
+div[data-testid="stMetric"]:hover,
+div[data-testid="stPlotlyChart"]:hover {
+
+    transform:
+        translateY(-1px);
+}
+
+/* -------------------------------
+   CLEAN TEXT CONTRAST
+-------------------------------- */
+
+body,
+p,
+span,
+label,
+div {
+
+    color: #e5e7eb;
+}
+
+/* -------------------------------
+   SECTION BALANCE
+-------------------------------- */
+
+h1,
+h2,
+h3 {
+
+    margin-bottom: 0.6rem;
+}
+
+/* -------------------------------
+   KPI VISUAL RHYTHM
+-------------------------------- */
+
+div[data-testid="stMetric"] {
+
+    min-height: 115px;
+}
+
+/* -------------------------------
+   BUTTON POLISH
+-------------------------------- */
+
+.stButton > button {
+
+    border:
+        1px solid rgba(255,255,255,0.05);
+
+    backdrop-filter: blur(6px);
+
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* -------------------------------
+   SIDEBAR VISUAL BALANCE
+-------------------------------- */
+
+[data-testid="stSidebar"] {
+
+    backdrop-filter: blur(10px);
+
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* -------------------------------
+   CLEAN CODE PANELS
+-------------------------------- */
+
+pre,
+code {
+
+    border-radius: 10px;
+}
+
+/* -------------------------------
+   STREAMLIT ELEMENT NORMALIZATION
+-------------------------------- */
+
+[data-testid="stVerticalBlock"] {
+
+    gap: 0.75rem;
+}
+
+/* -------------------------------
+   OPERATIONAL DEPTH
+-------------------------------- */
+
+div[data-testid="stMetric"],
+div[data-testid="stPlotlyChart"] {
+
+    box-shadow:
+        0 6px 20px rgba(0,0,0,0.22);
+}
+
+/* -------------------------------
+   FINAL VISUAL BALANCE
+-------------------------------- */
+
+.block-container {
+
+    padding-bottom: 3rem;
+}
+
+/* -------------------------------
+   CLEAN SCROLL EXPERIENCE
+-------------------------------- */
+
+html {
+
+    scroll-behavior: smooth;
+}
+
+/* -------------------------------
+   FINAL SOC FEEL
+-------------------------------- */
+
+body {
+
+    background:
+        linear-gradient(
+            180deg,
+            #020617,
+            #081225
+        );
+}
+
+/* =========================================================
+   UX-2.1 — CUSTOM SOC TOPBAR
+   ========================================================= */
+
+.soc-topbar {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    padding: 1rem 1.4rem;
+
+    margin-bottom: 1.2rem;
+
+    border-radius: 18px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(15,23,42,0.92),
+            rgba(15,23,42,0.82)
+        );
+
+    border:
+        1px solid rgba(255,255,255,0.06);
+
+    box-shadow:
+        0 6px 22px rgba(0,0,0,0.22);
+
+    backdrop-filter: blur(12px);
+
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* -------------------------------
+   LEFT SIDE
+-------------------------------- */
+
+.soc-topbar-left {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 1rem;
+}
+
+/* -------------------------------
+   PLATFORM TITLE
+-------------------------------- */
+
+.soc-logo {
+
+    font-size: 1.05rem;
+
+    font-weight: 800;
+
+    letter-spacing: 0.5px;
+
+    color: #f8fafc;
+}
+
+/* -------------------------------
+   LIVE STATUS
+-------------------------------- */
+
+.soc-status {
+
+    color: #34d399;
+
+    font-size: 0.88rem;
+
+    font-weight: 700;
+
+    letter-spacing: 0.3px;
+}
+
+/* -------------------------------
+   RIGHT SIDE
+-------------------------------- */
+
+.soc-topbar-right {
+
+    display: flex;
+
+    gap: 0.7rem;
+
+    align-items: center;
+}
+
+/* -------------------------------
+   STATUS PILLS
+-------------------------------- */
+
+.soc-pill {
+
+    padding: 0.45rem 0.8rem;
+
+    border-radius: 999px;
+
+    background:
+        rgba(30,41,59,0.9);
+
+    border:
+        1px solid rgba(255,255,255,0.05);
+
+    color: #cbd5e1;
+
+    font-size: 0.8rem;
+
+    font-weight: 650;
+
+    letter-spacing: 0.25px;
+}
+
+/* -------------------------------
+   RESPONSIVE TOPBAR
+-------------------------------- */
+
+@media screen and (max-width: 1200px) {
+
+    .soc-topbar {
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 1rem;
+    }
+
+    .soc-topbar-right {
+
+        flex-wrap: wrap;
+    }
+}
+
+
+if not st.session_state.simulation_started:
+
+    st.markdown("""
+    <div class="status-banner standby-banner">
+        ⚪ SYSTEM READY — Awaiting Simulation Execution
+    </div>
+    """, unsafe_allow_html=True)
+
+else:
+
+    st.markdown(f"""
+    <div class="status-banner active-banner">
+        🔴 ACTIVE THREAT DETECTION — Attack Simulation Running
+    </div>
+    """, unsafe_allow_html=True)
+
+
+.status-banner{
+    padding:18px;
+    border-radius:16px;
+    text-align:center;
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:25px;
+    border:1px solid rgba(255,255,255,0.08);
+}
+
+.standby-banner{
+    background:linear-gradient(90deg,#1e2d46,#1a263d);
+    color:#dbe7ff;
+}
+
+.active-banner{
+    background:linear-gradient(90deg,#4b1111,#7a1717);
+    color:#ffffff;
+    box-shadow:0 0 20px rgba(255,0,0,0.25);
+}
+
+.event-console{
+    background:#071427;
+    border-radius:18px;
+    padding:20px;
+    border:1px solid rgba(255,255,255,0.06);
+    margin-top:10px;
+    margin-bottom:20px;
+}
+
+.event-item{
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:12px;
+    font-size:15px;
+    font-weight:600;
+    border-left:5px solid;
+}
+
+.info-event{
+    background:#10233f;
+    border-color:#2d8cff;
+    color:#d8e9ff;
+}
+
+.standby-event{
+    background:#1d2534;
+    border-color:#9aa4b2;
+    color:#f1f5f9;
+}
+
+
+.warning-event{
+    background:#3a2608;
+    border-color:#ffb020;
+    color:#ffe7b3;
+}
+
+.critical-event{
+    background:#4a1010;
+    border-color:#ff4d4d;
+    color:#ffd6d6;
+    box-shadow:0 0 12px rgba(255,0,0,0.18);
+}
