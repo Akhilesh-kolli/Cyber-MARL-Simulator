@@ -87,6 +87,8 @@ def execute_simulation_step(
     risk_score_live = metrics.get("risk_score", 0.0)
     threat_level = metrics.get("threat_level", "LOW")
     attack_stage = metrics.get("attack_stage", "Idle")
+    mitre_data = None
+    defender_target = -1
     
     # ------------------------------------------
     # Attacker Action execution
