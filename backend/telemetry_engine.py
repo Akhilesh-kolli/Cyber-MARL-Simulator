@@ -54,9 +54,9 @@ def update_telemetry_metrics(state: dict):
         status = e.get("status")
         tech = e.get("technique")
         severity = e.get("severity")
-        kill_chain = e.get("kill_chain", "")
-        tactic = e.get("tactic", "")
-        vuln = e.get("vulnerability", "")
+        kill_chain = e.get("kill_chain") or ""
+        tactic = e.get("tactic") or ""
+        vuln = e.get("vulnerability") or ""
         port = e.get("port")
         service = e.get("service")
         
@@ -94,7 +94,7 @@ def update_telemetry_metrics(state: dict):
             if "lateral" in kill_chain.lower() or "lateral" in tactic.lower():
                 lateral_movement_count += 1
                 
-            if "SQL Injection" in vuln or "SQL Injection" in e.get("message", ""):
+            if "SQL Injection" in vuln or "SQL Injection" in (e.get("message") or ""):
                 sqli_detected += 1
                 
             # Confidence
