@@ -153,3 +153,10 @@ def initialize_session_state(st):
     status = st.session_state.simulation_state["simulation"]["status"]
     st.session_state.simulation_started = (status in ("running", "completed"))
     st.session_state.simulation_complete = (status == "completed")
+
+    # Authoritative visual and threat metrics cache initialization
+    if "network_graph_fig" not in st.session_state:
+        st.session_state.network_graph_fig = None
+    if "alert_fatigue_score" not in st.session_state:
+        st.session_state.alert_fatigue_score = 0
+
