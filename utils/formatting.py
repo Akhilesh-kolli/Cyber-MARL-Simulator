@@ -18,7 +18,7 @@ def format_event_log(event: dict) -> str:
     severity = event.get("threat", "INFO")
     technique = event.get("technique", "None") or "None"
     cve = event.get("cve", "N/A")
-    risk_delta = event.get("risk_delta", 0)
+    risk_delta = int(float(event.get("risk_delta", 0)))
     compromise_count = event.get("compromise_count_snapshot", event.get("compromised_count", 0))
     explanation = event.get("explanation", "")
 
