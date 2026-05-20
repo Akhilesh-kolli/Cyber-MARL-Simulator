@@ -45,6 +45,8 @@ from risk_engine import (
     get_alert_fatigue_score,
     get_attack_success_rate,
     get_dominant_technique,
+    calculate_bounded_risk_score,
+    get_next_attack_stage,
 )
 from soc_engine import SOCEngine
 from ioc_engine import IOCEngine
@@ -82,44 +84,101 @@ top1, top2 = st.columns([3, 2])
 if "simulation_started" not in st.session_state:
     st.session_state.simulation_started = False
 
-if "simulation_data" not in st.session_state:
-    st.session_state.simulation_data = {
-        "risk_score": 0,
-        "incident_priority": "LOW",
-        "incident_status": "IDLE",
-        "threat_level": "LOW",
-        "ioc_ports": set(),
-        "ioc_techniques": set(),
-        "compromised_assets": set(),
-        "observed_attack_stages": set(),
-        "critical_alerts": 0,
-        "high_severity_events": 0,
-        "recon_events": 0,
-        "discovery_events": 0,
-        "lateral_movement_count": 0,
-        "attack_attempts": 0,
-        "successful_attacks": 0,
-        "successful_defenses": 0,
-        "failed_defenses": 0,
-        "defense_actions_count": 0,
-        "threat_momentum_score": 0,
-        "persistence_score": 0,
-        "threat_correlation_score": 0,
-        "containment_pressure_score": 0,
-        "threat_volatility_score": 0,
-        "anomaly_pressure_score": 0,
-        "soc_recommendation": "Awaiting Simulation",
-        "attacker_profile": "Unknown",
-        "campaign_type": "Unknown Campaign",
-        "timeline_data": [],
-        "structured_events": [],
-        "event_logs": [],
-        "step_history": [],
-        "threat_history": [],
-        "compromise_history": [],
+if "simulation_complete" not in st.session_state:
+    st.session_state.simulation_complete = False
+
+if "network_graph_fig" not in st.session_state:
+    st.session_state.network_graph_fig = None
+
+if "simulation_state" not in st.session_state:
+    st.session_state.simulation_state = {
+        "nodes": {
+            i: {
+                "id": i,
+                "hostname": f"Host-{i}" if i != 4 else "Domain-Controller",
+                "role": SIMULATION_NODES.get(i, "Workstation"),
+                "status": "healthy",
+                "risk_score": 0.0,
+                "last_event": "None",
+                "compromise_stage": "None",
+                "techniques": [],
+                "ports": [],
+                "severity": "LOW",
+                "timeline": []
+            } for i in range(6)
+        },
+        "events": [],
+        "alerts": [],
+        "timeline": [],
+        "ioc_data": [],
+        "metrics": {
+            "risk_score": 0,
+            "incident_priority": "LOW",
+            "incident_status": "IDLE",
+            "threat_level": "LOW",
+            "ioc_ports": set(),
+            "ioc_techniques": set(),
+            "compromised_assets": set(),
+            "observed_attack_stages": set(),
+            "critical_alerts": 0,
+            "high_severity_events": 0,
+            "recon_events": 0,
+            "discovery_events": 0,
+            "lateral_movement_count": 0,
+            "attack_attempts": 0,
+            "successful_attacks": 0,
+            "successful_defenses": 0,
+            "failed_defenses": 0,
+            "defense_actions_count": 0,
+            "threat_momentum_score": 0,
+            "persistence_score": 0,
+            "threat_correlation_score": 0,
+            "containment_pressure_score": 0,
+            "threat_volatility_score": 0,
+            "anomaly_pressure_score": 0,
+            "soc_recommendation": "Awaiting Simulation",
+            "attacker_profile": "Unknown",
+            "campaign_type": "Unknown Campaign",
+            "timeline_data": [],
+            "structured_events": [],
+            "event_logs": [],
+            "step_history": [],
+            "threat_history": [],
+            "compromise_history": [],
+            "sqli_detected": 0,
+            "alert_fatigue_score": 0.0,
+            "alert_confidence_total": 0.0,
+            "alert_count": 0,
+            "technique_counts": {
+                "T1190": 0,
+                "T1021": 0,
+                "T1046": 0,
+                "T1595": 0
+            },
+            "average_alert_confidence": 0.0,
+            "compromised_count": 0,
+            "estimated_dwell_time": 0,
+            "total_reward": 0.0,
+            "defense_effectiveness": 0.0,
+            "attack_success_rate": 0.0,
+            "attack_stage": "Idle",
+            "defense_history": [],
+            "momentum_history": []
+        },
+        "risk_state": {
+            "risk_score": 0,
+            "incident_priority": "LOW",
+            "incident_status": "IDLE",
+            "threat_level": "LOW"
+        },
+        "graph_state": {
+            "nodes": [],
+            "edges": []
+        }
     }
 
-SIM_STATE = st.session_state.simulation_data
+st.session_state.simulation_data = st.session_state.simulation_state
+SIM_STATE = st.session_state.simulation_state["metrics"]
 
 # Robustness check: Ensure all required keys exist in session state
 required_defaults = {
@@ -136,17 +195,226 @@ required_defaults = {
     "campaign_type": "Unknown Campaign", "timeline_data": [],
     "structured_events": [], "event_logs": [], "step_history": [],
     "threat_history": [], "compromise_history": [],
+    "sqli_detected": 0, "alert_fatigue_score": 0.0, "alert_confidence_total": 0.0,
+    "alert_count": 0, "technique_counts": {"T1190": 0, "T1021": 0, "T1046": 0, "T1595": 0},
+    "average_alert_confidence": 0.0, "compromised_count": 0, "estimated_dwell_time": 0,
+    "total_reward": 0.0, "defense_effectiveness": 0.0, "attack_success_rate": 0.0,
+    "attack_stage": "Idle", "defense_history": [], "momentum_history": []
 }
 for key, default in required_defaults.items():
     if key not in SIM_STATE:
         SIM_STATE[key] = default
+
+# Alias for forward compatibility (Fix 17)
+SIM_STATE["metrics"] = SIM_STATE
+
+# Extract state variables to local scope for downstream compatibility and rerun stability
+compromised_count = SIM_STATE["compromised_count"]
+estimated_dwell_time = SIM_STATE["estimated_dwell_time"]
+technique_counts = SIM_STATE["technique_counts"]
+sqli_detected = SIM_STATE["sqli_detected"]
+alert_fatigue_score = SIM_STATE["alert_fatigue_score"]
+alert_confidence_total = SIM_STATE["alert_confidence_total"]
+alert_count = SIM_STATE["alert_count"]
+average_alert_confidence = SIM_STATE["average_alert_confidence"]
+attack_success_rate = SIM_STATE["attack_success_rate"]
+defense_effectiveness = SIM_STATE["defense_effectiveness"]
+total_reward = SIM_STATE["total_reward"]
+threat_level = SIM_STATE["threat_level"]
+attack_stage = SIM_STATE["attack_stage"]
+
+# Re-calculate derived metrics at the top to ensure they are available for all workspaces
+if st.session_state.simulation_started:
+    # Rate calculations
+    if SIM_STATE["attack_attempts"] > 0:
+        attack_success_rate = (SIM_STATE["successful_attacks"] / SIM_STATE["attack_attempts"]) * 100
+    else:
+        attack_success_rate = 0.0
+
+    if SIM_STATE["defense_actions_count"] > 0:
+        defense_effectiveness = (SIM_STATE["successful_defenses"] / SIM_STATE["defense_actions_count"]) * 100
+    else:
+        defense_effectiveness = 0.0
+
+    SIM_STATE["attack_success_rate"] = attack_success_rate
+    SIM_STATE["defense_effectiveness"] = defense_effectiveness
+
+    # Incident Priority & Status (Fix 4)
+    if (
+        compromised_count >= 5
+        or SIM_STATE["risk_score"] >= 90.0
+        or SIM_STATE["lateral_movement_count"] >= 5
+    ):
+        SIM_STATE["incident_priority"] = "P1"
+    elif (
+        compromised_count >= 3
+        or SIM_STATE["risk_score"] >= 70.0
+        or SIM_STATE["discovery_events"] >= 5
+    ):
+        SIM_STATE["incident_priority"] = "P2"
+    else:
+        SIM_STATE["incident_priority"] = "LOW"
+
+    if (
+        compromised_count >= 5
+        or (
+            SIM_STATE["lateral_movement_count"] >= 4
+            and SIM_STATE["high_severity_events"] >= 10
+        )
+    ):
+        SIM_STATE["incident_status"] = "BREACH CONFIRMED"
+    elif (
+        SIM_STATE["risk_score"] >= 70.0
+        or compromised_count >= 3
+    ):
+        SIM_STATE["incident_status"] = "ACTIVE INCIDENT"
+    else:
+        SIM_STATE["incident_status"] = "MONITORING"
+
+    # Estimated Dwell Time
+    estimated_dwell_time = get_dwell_time(compromised_count)
+    SIM_STATE["estimated_dwell_time"] = estimated_dwell_time
+
+    # Campaign Diversity Score
+    campaign_diversity_score = min(
+        100,
+        (
+            len(SIM_STATE["ioc_techniques"]) * 6
+        )
+        + (
+            len(SIM_STATE["observed_attack_stages"]) * 10
+        )
+        + (
+            SIM_STATE["lateral_movement_count"] * 3
+        )
+    )
+
+    # Average Alert Confidence
+    if alert_count > 0:
+        average_alert_confidence = alert_confidence_total / alert_count
+        average_alert_confidence = min(average_alert_confidence, 100)
+    else:
+        average_alert_confidence = 0.0
+    SIM_STATE["average_alert_confidence"] = average_alert_confidence
+
+    # Attacker Profile
+    if compromised_count <= 1:
+        SIM_STATE["attacker_profile"] = "Opportunistic Scanner"
+    elif SIM_STATE["recon_events"] >= 5 and compromised_count <= 3:
+        SIM_STATE["attacker_profile"] = "Reconnaissance Operator"
+    elif (
+        SIM_STATE["lateral_movement_count"] >= 4
+        or SIM_STATE["persistence_score"] >= 12
+    ):
+        SIM_STATE["attacker_profile"] = "Advanced Persistent Threat"
+    elif SIM_STATE["discovery_events"] >= 6:
+        SIM_STATE["attacker_profile"] = "Internal Network Explorer"
+    else:
+        SIM_STATE["attacker_profile"] = "Targeted Adversary"
+
+    # Campaign Type
+    if (
+        SIM_STATE["recon_events"] >= 6
+        and compromised_count <= 2
+    ):
+        SIM_STATE["campaign_type"] = "Reconnaissance Campaign"
+    elif (
+        SIM_STATE["lateral_movement_count"] >= 4
+        and compromised_count >= 3
+    ):
+        SIM_STATE["campaign_type"] = "Lateral Expansion Campaign"
+    elif (
+        SIM_STATE["persistence_score"] >= 12
+        and SIM_STATE["threat_correlation_score"] >= 40
+    ):
+        SIM_STATE["campaign_type"] = "Persistent Intrusion Campaign"
+    elif (
+        SIM_STATE["threat_momentum_score"] >= 60
+        and campaign_diversity_score >= 50
+    ):
+        SIM_STATE["campaign_type"] = "Coordinated Multi-Stage Campaign"
+    else:
+        SIM_STATE["campaign_type"] = "General Intrusion Campaign"
+
+    # SOC Recommendation
+    if compromised_count >= 5:
+        SIM_STATE["soc_recommendation"] = "Initiate Enterprise Incident Response"
+    elif SIM_STATE["lateral_movement_count"] >= 4:
+        SIM_STATE["soc_recommendation"] = "Contain Lateral Movement Immediately"
+    elif SIM_STATE["discovery_events"] >= 5:
+        SIM_STATE["soc_recommendation"] = "Investigate Internal Reconnaissance Activity"
+    elif SIM_STATE["recon_events"] >= 5:
+        SIM_STATE["soc_recommendation"] = "Increase External Monitoring"
+    elif SIM_STATE["incident_priority"] == "P2":
+        SIM_STATE["soc_recommendation"] = "Escalate To SOC Team"
+    else:
+        SIM_STATE["soc_recommendation"] = "Continue Monitoring"
+
+    # Stability Index and Research Consistency
+    soc_stability_index = max(
+        25,
+        100
+        - (compromised_count * 8)
+        - (SIM_STATE["critical_alerts"] * 1.5)
+        - (SIM_STATE["threat_momentum_score"] * 0.18)
+        - (SIM_STATE["anomaly_pressure_score"] * 0.12)
+    )
+    research_consistency_score = max(
+        0,
+        100
+        - (SIM_STATE["threat_volatility_score"] * 0.45)
+        - (SIM_STATE["anomaly_pressure_score"] * 0.30)
+        - (SIM_STATE["containment_pressure_score"] * 0.20)
+    )
+    research_consistency_score += (
+        average_alert_confidence * 0.05
+    )
+    research_consistency_score = min(
+        research_consistency_score,
+        100
+    )
+
+    # Threat Actor Attribution
+    if (
+        SIM_STATE["persistence_score"] >= 12
+        and SIM_STATE["threat_correlation_score"] >= 40
+    ):
+        threat_actor_confidence = 95
+    elif (
+        SIM_STATE["lateral_movement_count"] >= 4
+        and campaign_diversity_score >= 50
+    ):
+        threat_actor_confidence = 82
+    elif (
+        SIM_STATE["recon_events"] >= 5
+        and SIM_STATE["discovery_events"] >= 5
+    ):
+        threat_actor_confidence = 68
+    else:
+        threat_actor_confidence = 45
+
+    if threat_actor_confidence >= 90:
+        threat_actor_type = "Nation-State APT"
+    elif threat_actor_confidence >= 75:
+        threat_actor_type = "Organized Cybercrime"
+    elif threat_actor_confidence >= 60:
+        threat_actor_type = "Advanced Intrusion Actor"
+    else:
+        threat_actor_type = "Opportunistic Threat Actor"
+else:
+    campaign_diversity_score = 0
+    soc_stability_index = 100
+    research_consistency_score = 100
+    threat_actor_confidence = 0
+    threat_actor_type = "Unknown"
 with top1:
 
-    monitor_status = (
-        "🟢 LIVE MONITORING ACTIVE"
-        if st.session_state.simulation_started
-        else "⚪ STANDBY MODE"
-    )
+    if st.session_state.simulation_complete:
+        monitor_status = "🟢 SIMULATION COMPLETED — SOC ANALYTICS READY"
+    elif st.session_state.simulation_started:
+        monitor_status = "🔴 LIVE THREAT MONITORING ACTIVE"
+    else:
+        monitor_status = "⚪ STANDBY MODE — Awaiting Simulation"
 
     st.markdown(
         f"""
@@ -155,17 +423,47 @@ with top1:
         """
     )
 with top2:
-
     pill1, pill2, pill3 = st.columns(3)
 
+    # 1. Attacker state-aware pill
     with pill1:
-        st.success("ATTACKER")
+        if not st.session_state.simulation_started:
+            st.info("👾 ATTACKER: IDLE")
+        elif not st.session_state.simulation_complete:
+            stage_upper = attack_stage.upper()
+            if attack_stage in ["Reconnaissance", "Discovery", "Scanning", "Idle"]:
+                st.warning(f"👾 ATTACKER: {stage_upper}")
+            else:
+                st.error(f"👾 ATTACKER: {stage_upper}")
+        else:
+            st.info(f"👾 ATTACKER: FINISHED ({attack_stage.upper()})")
 
+    # 2. Defender state-aware pill
     with pill2:
-        st.info("DEFENDER")
+        if not st.session_state.simulation_started:
+            st.info("🛡️ DEFENDER: STANDBY")
+        elif not st.session_state.simulation_complete:
+            if defense_effectiveness >= 70.0:
+                st.success(f"🛡️ DEFENDER: ACTIVE ({defense_effectiveness:.1f}%)")
+            elif defense_effectiveness >= 40.0:
+                st.warning(f"🛡️ DEFENDER: ACTIVE ({defense_effectiveness:.1f}%)")
+            else:
+                st.error(f"🛡️ DEFENDER: ALERT ({defense_effectiveness:.1f}%)")
+        else:
+            if defense_effectiveness >= 60.0:
+                st.success(f"🛡️ DEFENDER: SECURED ({defense_effectiveness:.1f}%)")
+            else:
+                st.error(f"🛡️ DEFENDER: COMPROMISED ({defense_effectiveness:.1f}%)")
 
+    # 3. Engine / Platform state-aware pill
     with pill3:
-        st.warning("ENGINE")
+        if not st.session_state.simulation_started:
+            st.warning("⚙️ ENGINE: READY")
+        elif not st.session_state.simulation_complete:
+            st.success("⚙️ ENGINE: SIMULATING")
+        else:
+            st.success("⚙️ ENGINE: ANALYZED")
+
 
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
@@ -244,22 +542,8 @@ with kpi4:
         incident_status,
         delta=incident_delta
     )
+# Duplicate banner removed - Status represented in Top Hero Header
 
-if not st.session_state.simulation_started:
-
-    st.markdown("""
-    <div class="status-banner standby-banner">
-        ⚪ SYSTEM READY — Awaiting Simulation Execution
-    </div>
-    """, unsafe_allow_html=True)
-
-else:
-
-    st.markdown(f"""
-    <div class="status-banner active-banner">
-        🔴 ACTIVE THREAT DETECTION — Attack Simulation Running
-    </div>
-    """, unsafe_allow_html=True)
 
 
 VULNERABILITY_DB = {
@@ -457,65 +741,107 @@ speed = st.sidebar.slider(
 )
 
 run_button = st.sidebar.button("▶ Start Simulation")
+reset_button = st.sidebar.button("🔄 Reset Simulation")
 
-if "simulation_started" not in st.session_state:
+if reset_button:
     st.session_state.simulation_started = False
-
-if "simulation_complete" not in st.session_state:
     st.session_state.simulation_complete = False
-
-if "simulation_data" not in st.session_state:
-    st.session_state.simulation_data = {
-
-        # CORE
-        "risk_score": 0,
-        "incident_priority": "LOW",
-        "incident_status": "IDLE",
-        "threat_level": "LOW",
-
-        # IOC
-        "ioc_ports": set(),
-        "ioc_techniques": set(),
-        "compromised_assets": set(),
-        "observed_attack_stages": set(),
-
-        # COUNTERS
-        "critical_alerts": 0,
-        "high_severity_events": 0,
-        "recon_events": 0,
-        "discovery_events": 0,
-        "lateral_movement_count": 0,
-
-        # PERFORMANCE
-        "attack_attempts": 0,
-        "successful_attacks": 0,
-        "successful_defenses": 0,
-        "failed_defenses": 0,
-        "defense_actions_count": 0,
-
-        # SCORES
-        "threat_momentum_score": 0,
-        "persistence_score": 0,
-        "threat_correlation_score": 0,
-        "containment_pressure_score": 0,
-        "threat_volatility_score": 0,
-        "anomaly_pressure_score": 0,
-
-        # EXECUTIVE
-        "soc_recommendation": "Awaiting Simulation",
-        "attacker_profile": "Unknown",
-        "campaign_type": "Unknown Campaign",
-
-        # TIMELINE
-        "timeline_data": [],
-        "structured_events": [],
-        "event_logs": [],
-
-        # HISTORY
-        "step_history": [],
-        "threat_history": [],
-        "compromise_history": []
+    if "network_graph_fig" in st.session_state:
+        st.session_state.network_graph_fig = None
+    # Re-initialize st.session_state.simulation_state to default values
+    st.session_state.simulation_state = {
+        "nodes": {
+            i: {
+                "id": i,
+                "hostname": f"Host-{i}" if i != 4 else "Domain-Controller",
+                "role": SIMULATION_NODES.get(i, "Workstation"),
+                "status": "healthy",
+                "risk_score": 0.0,
+                "last_event": "None",
+                "compromise_stage": "None",
+                "techniques": [],
+                "ports": [],
+                "severity": "LOW",
+                "timeline": []
+            } for i in range(6)
+        },
+        "events": [],
+        "alerts": [],
+        "timeline": [],
+        "ioc_data": [],
+        "metrics": {
+            "risk_score": 0,
+            "incident_priority": "LOW",
+            "incident_status": "IDLE",
+            "threat_level": "LOW",
+            "ioc_ports": set(),
+            "ioc_techniques": set(),
+            "compromised_assets": set(),
+            "observed_attack_stages": set(),
+            "critical_alerts": 0,
+            "high_severity_events": 0,
+            "recon_events": 0,
+            "discovery_events": 0,
+            "lateral_movement_count": 0,
+            "attack_attempts": 0,
+            "successful_attacks": 0,
+            "successful_defenses": 0,
+            "failed_defenses": 0,
+            "defense_actions_count": 0,
+            "threat_momentum_score": 0,
+            "persistence_score": 0,
+            "threat_correlation_score": 0,
+            "containment_pressure_score": 0,
+            "threat_volatility_score": 0,
+            "anomaly_pressure_score": 0,
+            "soc_recommendation": "Awaiting Simulation",
+            "attacker_profile": "Unknown",
+            "campaign_type": "Unknown Campaign",
+            "timeline_data": [],
+            "structured_events": [],
+            "event_logs": [],
+            "step_history": [],
+            "threat_history": [],
+            "compromise_history": [],
+            "sqli_detected": 0,
+            "alert_fatigue_score": 0.0,
+            "alert_confidence_total": 0.0,
+            "alert_count": 0,
+            "technique_counts": {
+                "T1190": 0,
+                "T1021": 0,
+                "T1046": 0,
+                "T1595": 0
+            },
+            "average_alert_confidence": 0.0,
+            "compromised_count": 0,
+            "estimated_dwell_time": 0,
+            "total_reward": 0.0,
+            "defense_effectiveness": 0.0,
+            "attack_success_rate": 0.0,
+            "attack_stage": "Idle",
+            "defense_history": [],
+            "momentum_history": []
+        },
+        "risk_state": {
+            "risk_score": 0,
+            "incident_priority": "LOW",
+            "incident_status": "IDLE",
+            "threat_level": "LOW"
+        },
+        "graph_state": {
+            "nodes": [],
+            "edges": []
+        }
     }
+    st.session_state.simulation_data = st.session_state.simulation_state
+    st.rerun()
+
+if "soc_workspace" not in st.session_state:
+    st.session_state.soc_workspace = "Overview"
+
+if run_button:
+    st.session_state.soc_workspace = "Overview"
 
 workspace = st.sidebar.radio(
     "SOC Workspace",
@@ -525,8 +851,11 @@ workspace = st.sidebar.radio(
         "IOC Intelligence",
         "MITRE Analytics",
         "Executive View"
-    ]
+    ],
+    key="soc_workspace"
 )
+
+timer_placeholder = st.sidebar.empty()
 
 # --------------------------------------------------
 # METRICS
@@ -543,77 +872,82 @@ threat_metric = col4.empty()
 # --------------------------------------------------
 services = scan_local_services()
 
-st.markdown("## 🌐 Real Infrastructure Status")
+if workspace == "Overview":
+    st.markdown("## 🌐 Real Infrastructure Status")
 
-svc1, svc2, svc3 = st.columns(3)
+    svc1, svc2, svc3 = st.columns(3)
 
-with svc1:
-    if services["DVWA"]:
-        st.success("DVWA Vulnerable Web App : ONLINE")
-    else:
-        st.error("DVWA Vulnerable Web App : OFFLINE")
+    with svc1:
+        if services["DVWA"]:
+            st.success("DVWA Vulnerable Web App : ONLINE")
+        else:
+            st.error("DVWA Vulnerable Web App : OFFLINE")
 
-with svc2:
-    if services["MySQL"]:
-        st.success("MySQL Database : ONLINE")
-    else:
-        st.error("MySQL Database : OFFLINE")
+    with svc2:
+        if services["MySQL"]:
+            st.success("MySQL Database : ONLINE")
+        else:
+            st.error("MySQL Database : OFFLINE")
 
-with svc3:
-    if services["Nginx"]:
-        st.success("Nginx Internal Service : ONLINE")
-    else:
-        st.error("Nginx Internal Service : OFFLINE")
+    with svc3:
+        if services["Nginx"]:
+            st.success("Nginx Internal Service : ONLINE")
+        else:
+            st.error("Nginx Internal Service : OFFLINE")
 
 # --------------------------------------------------
-# GRAPH PLACEHOLDER
+# GRAPH & EVENT LOG PLACEHOLDERS (Defined unconditionally for simulation loop safety)
 # --------------------------------------------------
 graph_placeholder = st.empty()
-
-# --------------------------------------------------
-# EVENT LOGS
-# --------------------------------------------------
-st.markdown("## 📜 Live Threat Events")
-
-if not st.session_state.simulation_started:
-
-    event_feed = """
-    <div class="event-console">
-
-    <div class="event-item info-event">
-    [INFO] SOC monitoring initialized successfully
-    </div>
-
-    <div class="event-item standby-event">
-    [STANDBY] Awaiting attacker simulation trigger
-    </div>
-
-    </div>
-    """
-
-else:
-
-    event_feed = """
-    <div class="event-console">
-
-    <div class="event-item critical-event">
-    [ALERT] Active adversarial activity detected
-    </div>
-
-    <div class="event-item warning-event">
-    [WARNING] Multi-agent attack simulation in progress
-    </div>
-
-    <div class="event-item info-event">
-    [INFO] Defender agent responding to threat events
-    </div>
-
-    </div>
-    """
-
-st.markdown(event_feed, unsafe_allow_html=True)
-
 log_placeholder = st.empty()
+
+# Render these ONLY if workspace is "Overview"
+if workspace == "Overview":
+    # 1. Render persistent graph if available
+    if st.session_state.network_graph_fig is not None:
+        with graph_placeholder.container():
+            st.markdown('<div class="graph-card">', unsafe_allow_html=True)
+            st.image(st.session_state.network_graph_fig)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # 2. Render dynamic event console
+    st.markdown("## 📜 Live Threat Events")
+    event_feed_items = []
+    if not st.session_state.simulation_started:
+        event_feed_items.append('<div class="event-item info-event">[INFO] SOC monitoring initialized successfully</div>')
+        event_feed_items.append('<div class="event-item standby-event">[STANDBY] Awaiting attacker simulation trigger</div>')
+    else:
+        logs = SIM_STATE.get("event_logs", [])
+        if not logs:
+            event_feed_items.append('<div class="event-item info-event">[INFO] Simulation started...</div>')
+        else:
+            for log in logs[:15]:
+                cls = "standby-event"
+                if "ALERT" in log or "CRITICAL" in log or "Compromise" in log or "Breach" in log:
+                    cls = "critical-event"
+                elif "WARNING" in log or "Recon" in log or "Scan" in log:
+                    cls = "warning-event"
+                elif "INFO" in log or "Defender" in log:
+                    cls = "info-event"
+                event_feed_items.append(f'<div class="event-item {cls}">{log}</div>')
+
+    event_feed_html = f"""
+    <div class="event-console">
+        {"".join(event_feed_items)}
+    </div>
+    """
+    st.markdown(event_feed_html, unsafe_allow_html=True)
+
+    # 3. Render final threat feed logs area if simulation is completed
+    if st.session_state.simulation_complete and SIM_STATE.get("event_logs"):
+        log_placeholder.text_area(
+            "Final Threat Feed Logs",
+            "\n".join(SIM_STATE["event_logs"][-20:]),
+            height=260,
+            disabled=True,
+            key="soc_final_feed"
+        )
+
 
 # --------------------------------------------------
 # IOC INITIALIZATION — values live in SIM_STATE
@@ -628,107 +962,143 @@ if "alert_fatigue_score" not in st.session_state:
     st.session_state.alert_fatigue_score = 0
 
 # --------------------------------------------------
-# Threat Hunt Summary
+# Workspace-aware placeholder definitions
+# Always defined so the simulation loop can safely
+# reference them regardless of active workspace.
 # --------------------------------------------------
-st.markdown("## 🕵️ Threat Hunt Summary")
-hunt1, hunt2, hunt3 = st.columns(3)
-
-hunt1_placeholder = hunt1.empty()
-hunt2_placeholder = hunt2.empty()
-hunt3_placeholder = hunt3.empty()
-
-
-if st.session_state.simulation_started:
-    hunt1_placeholder.metric(
-        "Unique Techniques",
-        len(SIM_STATE["ioc_techniques"])
-    )
-
-    hunt2_placeholder.metric(
-        "Observed Ports",
-        len(SIM_STATE["ioc_ports"])
-    )
-
-    hunt3_placeholder.metric(
-        "Compromised Assets",
-        len(SIM_STATE["compromised_assets"])
-    )
-
-    st.markdown("## 🛡️ Detection Engineering")
-
-    detect1, detect2 = st.columns(2)
-
-    detect1.metric(
-        "Alert Fatigue Score",
-        f"{st.session_state.alert_fatigue_score:.1f}"
-    )
-
-    detect2.metric(
-        "SOC Recommendation",
-        SIM_STATE["soc_recommendation"]
-    )
-
-else:
-    st.info(
-        "▶ Run the simulation to activate threat hunting analytics."
-    )
-
-st.markdown("## 🧠 IOC Intelligence")
-
-ioc1, ioc2 = st.columns(2)
-
-ioc_ports_placeholder = ioc1.empty()
-ioc_tech_placeholder  = ioc2.empty()
-
-if SIM_STATE.get("ioc_ports"):
-    ioc_ports_placeholder.code(
-        ", ".join(sorted(SIM_STATE["ioc_ports"])),
-        language="text"
-    )
-else:
-    ioc_ports_placeholder.code(
-        "No ports observed yet.",
-        language="text"
-    )
-
-if SIM_STATE.get("ioc_techniques"):
-    ioc_tech_placeholder.code(
-        ", ".join(sorted(SIM_STATE["ioc_techniques"])),
-        language="text"
-    )
-else:
-    ioc_tech_placeholder.code(
-        "No techniques observed yet.",
-        language="text"
-    )
+hunt1_placeholder = st.empty()
+hunt2_placeholder = st.empty()
+hunt3_placeholder = st.empty()
+ioc_ports_placeholder = st.empty()
+ioc_tech_placeholder  = st.empty()
 
 # --------------------------------------------------
-# LOCAL SESSION VARIABLES
-# (not stored in SIM_STATE — per-run locals only)
+# Threat Hunt Summary (Threat Hunt workspace)
+# --------------------------------------------------
+if workspace == "Threat Hunt":
+    st.markdown("## 🕵️ Threat Hunt Summary")
+    hunt_c1, hunt_c2, hunt_c3 = st.columns(3)
+    hunt1_placeholder = hunt_c1.empty()
+    hunt2_placeholder = hunt_c2.empty()
+    hunt3_placeholder = hunt_c3.empty()
+
+    if st.session_state.simulation_started:
+        hunt1_placeholder.metric(
+            "Unique Techniques",
+            len(SIM_STATE["ioc_techniques"])
+        )
+        hunt2_placeholder.metric(
+            "Observed Ports",
+            len(SIM_STATE["ioc_ports"])
+        )
+        hunt3_placeholder.metric(
+            "Compromised Assets",
+            len(SIM_STATE["compromised_assets"])
+        )
+
+        with st.expander("🔍 Threat Hunt Details", expanded=False):
+            det_c1, det_c2, det_c3 = st.columns(3)
+            det_c1.metric(
+                "Alert Fatigue Score",
+                f"{st.session_state.alert_fatigue_score:.1f}"
+            )
+            det_c2.metric(
+                "Successful Defenses",
+                SIM_STATE.get("successful_defenses", 0)
+            )
+            det_c3.metric(
+                "Failed Defenses",
+                SIM_STATE.get("failed_defenses", 0)
+            )
+
+            st.markdown("#### 🎯 Observed MITRE Techniques")
+            if SIM_STATE.get("ioc_techniques"):
+                tech_str = " · ".join(sorted(SIM_STATE["ioc_techniques"]))
+                st.markdown(f"`{tech_str}`")
+            else:
+                st.info("No techniques observed yet.")
+
+            st.markdown("#### 📡 Attack Stages Observed")
+            if SIM_STATE.get("observed_attack_stages"):
+                for stage in sorted(SIM_STATE["observed_attack_stages"]):
+                    st.markdown(f"- {stage}")
+            else:
+                st.info("No attack stages observed yet.")
+
+            st.markdown("#### 🛡️ SOC Recommendation")
+            st.markdown(
+                f'<div style="background:#0d2136;border-left:4px solid #0ea5e9;'
+                f'border-radius:8px;padding:14px 18px;color:#e2e8f0;font-size:1rem;'
+                f'font-weight:600;margin-top:8px;">'
+                f'🔒 {SIM_STATE["soc_recommendation"]}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+    else:
+        st.info(
+            "▶ Run the simulation to activate threat hunting analytics."
+        )
+
+# --------------------------------------------------
+# IOC Intelligence (IOC Intelligence workspace)
+# --------------------------------------------------
+elif workspace == "IOC Intelligence":
+    st.markdown("## 🧠 IOC Intelligence Registry")
+    
+    if st.session_state.simulation_started and SIM_STATE.get("structured_events"):
+        ioc_records = {}
+        for e in SIM_STATE["structured_events"]:
+            # Check for port IOC
+            if e.get("port"):
+                ioc_name = f"Port {e['port']}"
+                if ioc_name not in ioc_records:
+                    ioc_records[ioc_name] = {
+                        "IOC": ioc_name,
+                        "Type": "Network Port",
+                        "Severity": e["threat"],
+                        "First Seen": e["timestamp"],
+                        "Count": 1,
+                        "Confidence": f"{e['detection_confidence']}%" if e['detection_confidence'] else "N/A"
+                    }
+                else:
+                    ioc_records[ioc_name]["Count"] += 1
+
+            # Check for technique IOC
+            if e.get("technique"):
+                ioc_name = f"{e['technique']} - {e['mitre_name']}"
+                if ioc_name not in ioc_records:
+                    ioc_records[ioc_name] = {
+                        "IOC": ioc_name,
+                        "Type": "Adversary Technique",
+                        "Severity": e["threat"],
+                        "First Seen": e["timestamp"],
+                        "Count": 1,
+                        "Confidence": f"{e['detection_confidence']}%" if e['detection_confidence'] else "N/A"
+                    }
+                else:
+                    ioc_records[ioc_name]["Count"] += 1
+                    
+        if ioc_records:
+            ioc_df = pd.DataFrame(list(ioc_records.values()))
+            st.markdown("### 🔍 Complete Threat Indicator Registry")
+            st.dataframe(ioc_df, use_container_width=True)
+            
+            # Interactive Filter
+            ioc_type_filter = st.selectbox("Filter by Indicator Type", ["ALL", "Network Port", "Adversary Technique"])
+            if ioc_type_filter != "ALL":
+                filtered_ioc_df = ioc_df[ioc_df["Type"] == ioc_type_filter]
+                st.markdown(f"#### 🛡️ Filtered Indicators: {ioc_type_filter}")
+                st.dataframe(filtered_ioc_df, use_container_width=True)
+        else:
+            st.info("No IOCs detected during current simulation steps.")
+    else:
+        st.info("▶ Run the simulation to populate IOC Intelligence.")
+
+# --------------------------------------------------
+# ENGINE INSTANTIATION
 # --------------------------------------------------
 soc_engine = SOCEngine()
 ioc_engine = IOCEngine()
-
-compromised_count       = 0
-estimated_dwell_time    = 0
-technique_id            = "N/A"
-attack_stage            = "Idle"
-sqli_detected           = 0
-alert_fatigue_score     = 0
-soc_stability_index     = 100
-research_consistency_score = 100
-alert_confidence_total  = 0
-alert_count             = 0
-attack_success_rate     = 0
-defense_effectiveness   = 0
-
-# technique_counts: local per-run counter (not in SIM_STATE)
-technique_counts = {
-    "T1190": 0,
-    "T1021": 0,
-    "T1046": 0,
-    "T1595": 0
-}
 
 # --------------------------------------------------
 # RUN SIMULATION
@@ -737,6 +1107,36 @@ if run_button:
 
     st.session_state.simulation_started = True
     st.session_state.simulation_complete = False
+
+    st.session_state.simulation_state["nodes"] = {
+        i: {
+            "id": i,
+            "hostname": f"Host-{i}" if i != 4 else "Domain-Controller",
+            "role": SIMULATION_NODES.get(i, "Workstation"),
+            "status": "healthy",
+            "risk_score": 0.0,
+            "last_event": "None",
+            "compromise_stage": "None",
+            "techniques": [],
+            "ports": [],
+            "severity": "LOW",
+            "timeline": []
+        } for i in range(6)
+    }
+    st.session_state.simulation_state["events"] = []
+    st.session_state.simulation_state["alerts"] = []
+    st.session_state.simulation_state["timeline"] = []
+    st.session_state.simulation_state["ioc_data"] = []
+    st.session_state.simulation_state["risk_state"] = {
+        "risk_score": 0,
+        "incident_priority": "LOW",
+        "incident_status": "IDLE",
+        "threat_level": "LOW"
+    }
+    st.session_state.simulation_state["graph_state"] = {
+        "nodes": [],
+        "edges": []
+    }
 
     SIM_STATE.update({
         "ioc_ports": set(),
@@ -751,6 +1151,8 @@ if run_button:
         "step_history": [],
         "threat_history": [],
         "compromise_history": [],
+        "defense_history": [],
+        "momentum_history": [],
 
         "critical_alerts": 0,
         "high_severity_events": 0,
@@ -778,7 +1180,20 @@ if run_button:
 
         "soc_recommendation": "Awaiting Simulation",
         "attacker_profile": "Unknown",
-        "campaign_type": "Unknown Campaign"
+        "campaign_type": "Unknown Campaign",
+        "technique_counts": {
+            "T1190": 0,
+            "T1021": 0,
+            "T1046": 0,
+            "T1595": 0
+        },
+        "attack_stage": "Idle",
+        "average_alert_confidence": 0.0,
+        "compromised_count": 0,
+        "estimated_dwell_time": 0,
+        "total_reward": 0.0,
+        "defense_effectiveness": 0.0,
+        "attack_success_rate": 0.0
     })
 
     chart_placeholder    = st.empty()
@@ -789,6 +1204,9 @@ if run_button:
     sqli_detected     = 0
     alert_confidence_total = 0
     alert_count = 0
+    technique_counts = SIM_STATE["technique_counts"]
+    attack_stage = "Idle"
+    technique_id = "N/A"
 
     # ------------------------------------------
     # ADJACENCY-AWARE LATERAL MOVEMENT
@@ -855,13 +1273,13 @@ if run_button:
             + (SIM_STATE["high_severity_events"] * 5)
         )
 
-        if risk_score_live < 80:
+        if risk_score_live < 50:
             threat_level = "LOW"
 
-        elif risk_score_live < 180:
+        elif risk_score_live < 150:
             threat_level = "MEDIUM"
 
-        elif risk_score_live < 320:
+        elif risk_score_live < 260:
             threat_level = "HIGH"
 
         else:
@@ -878,6 +1296,10 @@ if run_button:
             ) * 100
         else:
             defense_effectiveness = 0
+
+        # Fix 12: Persist computed rates into SIM_STATE every step
+        SIM_STATE["attack_success_rate"] = attack_success_rate
+        SIM_STATE["defense_effectiveness"] = defense_effectiveness
 
 
         # ------------------------------------------
@@ -910,6 +1332,8 @@ if run_button:
             # --------------------------------------
             if node_id in real_ports:
                 port = real_ports[node_id]
+                # Fix 3: Track observed port before attack success check
+                SIM_STATE["ioc_ports"].add(str(port))
 
                 if port in [5000, 8080]:
                     attack_result = probe_http_service(port)
@@ -953,6 +1377,19 @@ if run_button:
                     if exploit_roll <= exploit_probability:
                         SIM_STATE["successful_attacks"] += 1
                         SIM_STATE["compromised_assets"].add(target_system)
+                        
+                        # Look up target node and update status
+                        if node_id in st.session_state.simulation_state["nodes"]:
+                            target_node = st.session_state.simulation_state["nodes"][node_id]
+                            target_node["status"] = "compromised"
+                            if technique_id not in target_node["techniques"]:
+                                target_node["techniques"].append(technique_id)
+                            p_str = str(port)
+                            if p_str not in target_node["ports"]:
+                                target_node["ports"].append(p_str)
+                            target_node["last_event"] = f"Exploit Succeeded: {technique_id}"
+                            target_node["compromise_stage"] = attack_stage
+                            target_node["severity"] = vuln_info.get("severity", "LOW")
 
                     else:
                         obs[node_id] = 0
@@ -971,6 +1408,22 @@ if run_button:
 
                 else:
                     action_text += " | Service Unreachable"
+            
+            elif current_compromised > previous_compromised:
+                # Internal nodes (nodes 3, 4, 5) without direct service mapping
+                SIM_STATE["successful_attacks"] += 1
+                SIM_STATE["compromised_assets"].add(target_system)
+                if node_id in st.session_state.simulation_state["nodes"]:
+                    target_node = st.session_state.simulation_state["nodes"][node_id]
+                    target_node["status"] = "compromised"
+                    if technique_id not in target_node["techniques"]:
+                        target_node["techniques"].append(technique_id)
+                    p_str = "N/A"
+                    if p_str not in target_node["ports"]:
+                        target_node["ports"].append(p_str)
+                    target_node["last_event"] = f"Internal Compromise: {technique_id}"
+                    target_node["compromise_stage"] = attack_stage
+                    target_node["severity"] = vuln_info.get("severity", "LOW")
 
             # Count technique from VULNERABILITY_DB mapping
             if technique_id in technique_counts:
@@ -1076,6 +1529,11 @@ if run_button:
                             0,
                             f"[DEFENDER] Contained Node {highest_risk_node}"
                         )
+                        
+                        if highest_risk_node in st.session_state.simulation_state["nodes"]:
+                            node_state = st.session_state.simulation_state["nodes"][highest_risk_node]
+                            node_state["status"] = "contained"
+                            node_state["last_event"] = "Contained by Defender"
 
                         # ------------------------------------------
                         # REWARD: successful containment
@@ -1105,7 +1563,12 @@ if run_button:
                                 containment_roll = np.random.random()
 
                                 if containment_roll <= 0.45:
+                                    was_compromised = (obs[neighbor] == 1)
                                     obs[neighbor] = 0
+                                    if was_compromised and neighbor in st.session_state.simulation_state["nodes"]:
+                                        neigh_node = st.session_state.simulation_state["nodes"][neighbor]
+                                        neigh_node["status"] = "contained"
+                                        neigh_node["last_event"] = "Cleaned up by Defender neighbor containment"
 
                         current_compromised = int(np.sum(obs))
                         compromised_count = current_compromised
@@ -1159,103 +1622,38 @@ if run_button:
         # THREAT LEVEL ANALYSIS
         # ------------------------------------------
         # threat_level derived from risk_score_live above;
-        # override to CRITICAL if node count is severe
-        if (
-            current_compromised >= 5
-            and SIM_STATE["high_severity_events"] >= 8
-        ):
-            threat_level = "CRITICAL"
-
-        # RISK SCORING
-
-        SIM_STATE["risk_score"] = (
-            (compromised_count * 70)
-            + (SIM_STATE["critical_alerts"] * 12)
-            + (SIM_STATE["high_severity_events"] * 8)
-            + (SIM_STATE["lateral_movement_count"] * 35)
-            + (SIM_STATE["discovery_events"] * 15)
-            + (SIM_STATE["recon_events"] * 10)
-        )
-
-        SIM_STATE["incident_priority"] = get_incident_priority(SIM_STATE["risk_score"])
-
-        alert_fatigue_score = get_alert_fatigue_score(
-            (
-                SIM_STATE["critical_alerts"]
-                + (SIM_STATE["high_severity_events"] * 0.5)
-                + (SIM_STATE["lateral_movement_count"] * 0.75)
-            ),
-            step + 1
-        )
-
-        SIM_STATE["incident_status"] = get_incident_status(
-            SIM_STATE["risk_score"],
-            compromised_count
-        )
-
-        SIM_STATE["attacker_profile"] = get_attacker_profile(
-            SIM_STATE["risk_score"],
-            SIM_STATE["lateral_movement_count"]
-        )
-
-        estimated_dwell_time = get_dwell_time(
-            compromised_count
-        )
-
-        SIM_STATE["soc_recommendation"] = get_soc_recommendation(
-            SIM_STATE["incident_priority"]
-        )
-
-        attack_success_rate = get_attack_success_rate(
-            SIM_STATE["successful_attacks"],
-            SIM_STATE["attack_attempts"]
-        )
-
-        dominant_technique = get_dominant_technique(
-            technique_counts
-        )
-
-
         # ------------------------------------------
-        # ATTACK PROGRESSION ENGINE
+        # ATTACK PROGRESSION & RISK SCORING
         # ------------------------------------------
-
-        if compromised_count == 0:
-            attack_stage = "Recon"
-
-        elif compromised_count <= 1:
-            if SIM_STATE["persistence_score"] >= 4:
-                attack_stage = "Initial Access"
-            else:
-                attack_stage = "Discovery"
-
-        elif compromised_count <= 3:
-            if SIM_STATE["lateral_movement_count"] >= 2:
-                attack_stage = "Lateral Movement"
-            else:
-                attack_stage = "Initial Access"
-
-        elif compromised_count <= 5:
-            if SIM_STATE["persistence_score"] >= 10:
-                attack_stage = "Persistence"
-            else:
-                attack_stage = "Lateral Movement"
-
-        else:
-            attack_stage = "Persistence"
-
+        previous_risk = float(SIM_STATE["risk_score"])
+        
+        logged_techniques = list(SIM_STATE["ioc_techniques"])
+        dc_compromised = (st.session_state.simulation_state["nodes"][4]["status"] == "compromised")
+        db_or_srv_root = (st.session_state.simulation_state["nodes"][2]["status"] == "compromised" or 
+                          st.session_state.simulation_state["nodes"][3]["status"] == "compromised")
+        
+        # Use risk engine for sequential campaign progression
+        attack_stage = get_next_attack_stage(
+            current_stage=attack_stage,
+            step=step,
+            compromised_count=compromised_count,
+            logged_techniques=logged_techniques,
+            dc_compromised=dc_compromised,
+            db_or_srv_root=db_or_srv_root,
+            persistence_score=SIM_STATE["persistence_score"]
+        )
+        
+        # Update persistence score
         if attack_stage == "Persistence":
             SIM_STATE["persistence_score"] += max(
                 1,
                 3 - (SIM_STATE["successful_defenses"] * 0.08)
             )
-
         elif attack_stage == "Lateral Movement":
             SIM_STATE["persistence_score"] += max(
                 1,
                 2 - (SIM_STATE["successful_defenses"] * 0.05)
             )
-
         elif attack_stage == "Initial Access":
             SIM_STATE["persistence_score"] += 1
 
@@ -1265,28 +1663,73 @@ if run_button:
         SIM_STATE["persistence_score"] -= (
             SIM_STATE["defense_actions_count"] * 0.05
         )
-
         SIM_STATE["persistence_score"] = max(
             SIM_STATE["persistence_score"],
             0
         )
+        
+        SIM_STATE["attack_stage"] = attack_stage
+        kill_chain_stage = attack_stage
+        
+        estimated_dwell_time = get_dwell_time(compromised_count)
+        privilege_escalation_count = 1 if db_or_srv_root else 0
+        
+        # Calculate bounded risk score
+        risk_score_live = calculate_bounded_risk_score(
+            nodes=st.session_state.simulation_state["nodes"],
+            lateral_movement_count=SIM_STATE["lateral_movement_count"],
+            privilege_escalation_count=privilege_escalation_count,
+            persistence_score=SIM_STATE["persistence_score"],
+            containment_failures=SIM_STATE["failed_defenses"],
+            events=SIM_STATE["structured_events"],
+            dwell_time=estimated_dwell_time,
+            current_stage=attack_stage
+        )
+        
+        SIM_STATE["risk_score"] = risk_score_live
+        risk_delta = int(risk_score_live - previous_risk)
+        
+        # Map threat level sequentially based on the campaign risk score
+        if risk_score_live < 45:
+            threat_level = "LOW"
+        elif risk_score_live < 70:
+            threat_level = "MEDIUM"
+        elif risk_score_live < 90:
+            threat_level = "HIGH"
+        else:
+            threat_level = "CRITICAL"
+
+        # Safeguard override to CRITICAL if node count is severe
+        if (
+            compromised_count >= 5
+            and SIM_STATE["high_severity_events"] >= 8
+        ):
+            threat_level = "CRITICAL"
+            
         action_text += f" | Stage: {attack_stage}"
         action_text += f" | Threat: {threat_level}"
-        kill_chain_stage = map_kill_chain(action_text)
-
-        # ------------------------------------------
-        # KILL CHAIN SYNCHRONIZATION
-        # Align kill chain rendering with attack
-        # progression engine for telemetry cohesion
-        # ------------------------------------------
-        if attack_stage == "Persistence":
-            kill_chain_stage = "Persistence"
-        elif attack_stage == "Lateral Movement":
-            kill_chain_stage = "Lateral Movement"
-        elif attack_stage == "Discovery":
-            kill_chain_stage = "Discovery"
-        elif attack_stage == "Initial Access":
-            kill_chain_stage = "Initial Access"
+        
+        # Incident Priority, Status, Attacker Profile & Recommendations derived from bounded scoring
+        SIM_STATE["incident_priority"] = get_incident_priority(risk_score_live)
+        SIM_STATE["incident_status"] = get_incident_status(risk_score_live, compromised_count)
+        SIM_STATE["attacker_profile"] = get_attacker_profile(risk_score_live, SIM_STATE["lateral_movement_count"])
+        SIM_STATE["soc_recommendation"] = get_soc_recommendation(SIM_STATE["incident_priority"])
+        
+        alert_fatigue_score = get_alert_fatigue_score(
+            SIM_STATE["critical_alerts"]
+            + (SIM_STATE["high_severity_events"] * 0.5)
+            + (SIM_STATE["lateral_movement_count"] * 0.75),
+            step + 1
+        )
+        
+        attack_success_rate = get_attack_success_rate(
+            SIM_STATE["successful_attacks"],
+            SIM_STATE["attack_attempts"]
+        )
+        
+        dominant_technique = get_dominant_technique(
+            technique_counts
+        )
 
         # ------------------------------------------
         # LIVE SOC COUNTERS
@@ -1462,11 +1905,14 @@ if run_button:
             )
 
         # ------------------------------------------
-        # REWARD STABILIZATION — telemetry coupling
+        # REWARD STABILIZATION — telemetry coupling (Fix 1)
         # ------------------------------------------
-        reward -= (SIM_STATE["threat_momentum_score"] * 0.015)
-        reward -= (SIM_STATE["persistence_score"] * 0.02)
-        reward += (SIM_STATE["successful_defenses"] * 0.08)
+        reward -= (SIM_STATE["threat_momentum_score"] * 0.005)
+        reward -= (SIM_STATE["persistence_score"] * 0.008)
+        reward += (SIM_STATE["successful_defenses"] * 0.25)
+        if compromised_count < previous_compromised:
+            reward += 8
+        reward = max(reward, -3)
 
         # ------------------------------------------
         # THREAT MOMENTUM DECAY
@@ -1491,6 +1937,8 @@ if run_button:
 
         # Accumulate reward after all modifications
         total_reward += reward
+        SIM_STATE["total_reward"] = total_reward
+        SIM_STATE["compromised_count"] = compromised_count
 
         # ------------------------------------------
         # FINAL LOG MESSAGE
@@ -1536,7 +1984,9 @@ if run_button:
 
             compromised_count=compromised_count,
 
-            step=step
+            step=step,
+            risk_delta=risk_delta,
+            compromise_count_snapshot=compromised_count
         )
 
         SIM_STATE["observed_attack_stages"].add(kill_chain_stage)
@@ -1630,34 +2080,43 @@ if run_button:
         })
 
         SIM_STATE["threat_history"].append(SIM_STATE["critical_alerts"])
-        if len(SIM_STATE["threat_history"]) >= 2:
-            pass
         SIM_STATE["compromise_history"].append(compromised_count)
+        SIM_STATE["defense_history"].append(SIM_STATE["successful_defenses"])
+        SIM_STATE["momentum_history"].append(SIM_STATE["threat_momentum_score"])
         SIM_STATE["step_history"].append(step)
 
         # ------------------------------------------
-        # NODE COLORS
+        # NODE COLORS FROM CANONICAL STATES
         # ------------------------------------------
+        def get_node_color(node_id):
+            status = st.session_state.simulation_state["nodes"][node_id]["status"]
+            if status == "compromised":
+                return "#ef4444"
+            elif status == "contained":
+                return "#eab308"
+            else:
+                return "#22c55e"
+
         colors = [
-            "#ff3b30" if obs[i] == 1 else "#34c759"
+            get_node_color(i)
             for i in range(env.node_count)
         ]
 
         # ------------------------------------------
-        # CREATE FIGURE
+        # CREATE FIGURE (Dark Theme)
         # ------------------------------------------
         fig, ax = plt.subplots(figsize=(12, 7))
-        fig.patch.set_facecolor("#f8fafc")
-        ax.set_facecolor("#f8fafc")
+        fig.patch.set_facecolor("#071028")
+        ax.set_facecolor("#071028")
 
         nx.draw_networkx_nodes(
             G, pos, node_color=colors,
-            node_size=2600, edgecolors="black",
+            node_size=2600, edgecolors="#0ea5e9",
             linewidths=2, ax=ax
         )
 
         nx.draw_networkx_edges(
-            G, pos, edge_color="gray",
+            G, pos, edge_color="#334155",
             width=2, ax=ax
         )
 
@@ -1665,14 +2124,14 @@ if run_button:
             G, pos, labels=labels,
             font_size=10,
             font_weight="bold",
-            font_color="black",
+            font_color="white",
             ax=ax
         )
 
         ax.set_title(
             f"Cyber Attack Simulation — Step {step}",
             fontsize=26,
-            color="black",
+            color="white",
             fontweight="bold",
             pad=20
         )
@@ -1680,24 +2139,43 @@ if run_button:
         ax.axis("off")
         plt.tight_layout()
 
+        # Save network graph figure to session state as persistent bytes
+        import io
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), edgecolor='none')
+        buf.seek(0)
+        st.session_state.network_graph_fig = buf.getvalue()
+
         with graph_placeholder.container():
             st.markdown(
                 '<div class="graph-card">',
                 unsafe_allow_html=True
             )
-
-            st.pyplot(fig)
-
+            st.image(st.session_state.network_graph_fig)
+            plt.close(fig)  # Fix 9: prevent matplotlib memory leak
             st.markdown(
                 '</div>',
                 unsafe_allow_html=True
             )
 
-
         reward_metric.metric("Total Reward",    round(total_reward, 2))
         comp_metric.metric("Compromised Nodes", compromised_count)
         step_metric.metric("Simulation Step",   step)
         threat_metric.metric("Threat Level",    threat_level)
+
+        # Update sidebar telemetry live during run
+        latency = SIM_STATE["estimated_dwell_time"] / max(compromised_count, 1)
+        containment_latency = SIM_STATE["containment_pressure_score"] * 0.15
+        timer_placeholder.markdown(
+            f"""
+            ---
+            ### ⏱️ Performance Telemetry
+            - **Current Step**: {step} / 20
+            - **Avg Detection Latency**: {latency:.2f} s
+            - **Containment Latency**: {containment_latency:.2f} s
+            """
+        )
+
 
 
 
@@ -1710,13 +2188,34 @@ if run_button:
             chart_df = build_chart_df(
                 SIM_STATE["step_history"],
                 SIM_STATE["threat_history"],
-                SIM_STATE["compromise_history"]
+                SIM_STATE["compromise_history"],
+                SIM_STATE.get("defense_history"),
+                SIM_STATE.get("momentum_history")
             )
 
-            st.line_chart(
-                chart_df.set_index("Step"),
-                use_container_width=True
+            # Build premium custom Plotly line chart
+            fig_chart = px.line(
+                chart_df,
+                x="Step",
+                y=["Critical Alerts", "Compromised Nodes", "Successful Defenses", "Threat Momentum"],
+                title="SOC Threat Analytics & Performance Trends",
+                template="plotly_dark",
+                color_discrete_map={
+                    "Critical Alerts": "#ff3b30",      # red
+                    "Compromised Nodes": "#ff9500",     # orange
+                    "Successful Defenses": "#34c759",    # green
+                    "Threat Momentum": "#0ea5e9"        # cyber cyan
+                }
             )
+            fig_chart.update_layout(
+                paper_bgcolor="#071028",
+                plot_bgcolor="#071028",
+                font_color="white",
+                xaxis=dict(showgrid=True, gridcolor="#1e293b"),
+                yaxis=dict(showgrid=True, gridcolor="#1e293b"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_chart, use_container_width=True, config={"responsive": True})
 
         # ------------------------------------------
         # LIVE LOG
@@ -1730,59 +2229,94 @@ if run_button:
         )
 
         # ------------------------------------------
-        # Update IOC Intelligence panels live
+        # Update IOC Intelligence panels live (Only if active workspace)
         # ------------------------------------------
-        port_list = [f"Port {p}" for p in sorted(SIM_STATE['ioc_ports'])]
-        tech_list = sorted(SIM_STATE["ioc_techniques"])
-        ioc_ports_placeholder.code(
-            "\n".join(port_list) if port_list else "No ports observed yet.",
-            language="text"
-        )
-        ioc_tech_placeholder.code(
-            "\n".join(tech_list) if tech_list else "No techniques observed yet.",
-            language="text"
-        )
+        if workspace == "IOC Intelligence":
+            port_list = [f"Port {p}" for p in sorted(SIM_STATE['ioc_ports'])]
+            tech_list = sorted(SIM_STATE["ioc_techniques"])
+            ioc_ports_placeholder.code(
+                "\n".join(port_list) if port_list else "No ports observed yet.",
+                language="text"
+            )
+            ioc_tech_placeholder.code(
+                "\n".join(tech_list) if tech_list else "No techniques observed yet.",
+                language="text"
+            )
 
-        # Update Threat Hunt placeholders live
-        hunt1_placeholder.metric(
-            "Unique Techniques",
-            len(SIM_STATE["ioc_techniques"])
-        )
-        hunt2_placeholder.metric(
-            "Observed Ports",
-            len(SIM_STATE["ioc_ports"])
-        )
-        hunt3_placeholder.metric(
-            "Compromised Assets",
-            len(SIM_STATE["compromised_assets"])
-        )
+        # Update Threat Hunt placeholders live (Only if active workspace)
+        if workspace == "Threat Hunt":
+            hunt1_placeholder.metric(
+                "Unique Techniques",
+                len(SIM_STATE["ioc_techniques"])
+            )
+            hunt2_placeholder.metric(
+                "Observed Ports",
+                len(SIM_STATE["ioc_ports"])
+            )
+            hunt3_placeholder.metric(
+                "Compromised Assets",
+                len(SIM_STATE["compromised_assets"])
+            )
+
+        # Sync all local variables back to SIM_STATE to ensure persistence across reruns
+        SIM_STATE["compromised_count"] = compromised_count
+        SIM_STATE["estimated_dwell_time"] = estimated_dwell_time
+        SIM_STATE["technique_counts"] = technique_counts
+        SIM_STATE["sqli_detected"] = sqli_detected
+        SIM_STATE["alert_fatigue_score"] = alert_fatigue_score
+        SIM_STATE["alert_confidence_total"] = alert_confidence_total
+        SIM_STATE["alert_count"] = alert_count
+        SIM_STATE["average_alert_confidence"] = average_alert_confidence
+        SIM_STATE["attack_success_rate"] = attack_success_rate
+        SIM_STATE["defense_effectiveness"] = defense_effectiveness
+        SIM_STATE["total_reward"] = total_reward
+        SIM_STATE["threat_level"] = threat_level
+        SIM_STATE["attack_stage"] = attack_stage
 
         # ------------------------------------------
         # SPEED — at loop level
         # ------------------------------------------
         time.sleep(speed)
 
-if st.session_state.simulation_started:
+    # Simulation loop completed — mark state
+    st.session_state.simulation_complete = True
+    st.success("✅ Simulation Complete — SOC Analytics Generated")
 
-    # --------------------------------------------------
-    # SOC DASHBOARD METRICS
-    # --------------------------------------------------
-    render_kpi_cards(
-        SIM_STATE["critical_alerts"],
-        sqli_detected,
-        SIM_STATE["recon_events"],
-        SIM_STATE["discovery_events"],
-        SIM_STATE["risk_score"],
-        SIM_STATE["incident_priority"],
-        SIM_STATE["incident_status"],
-        attack_success_rate,
-        defense_effectiveness,
-        SIM_STATE["attacker_profile"],
-        estimated_dwell_time,
-        SIM_STATE["high_severity_events"]
-    )
-else:
-    st.info("▶ Run the simulation to populate IOC intelligence.")
+# ------------------------------------------
+# SOC DASHBOARD METRICS (Overview workspace)
+# ------------------------------------------
+if workspace == "Overview":
+    if st.session_state.simulation_started:
+        # Recalculate derived metrics at module level to ensure latest state is rendered
+        if SIM_STATE["attack_attempts"] > 0:
+            SIM_STATE["attack_success_rate"] = (SIM_STATE["successful_attacks"] / SIM_STATE["attack_attempts"]) * 100
+        else:
+            SIM_STATE["attack_success_rate"] = 0.0
+
+        if SIM_STATE["defense_actions_count"] > 0:
+            SIM_STATE["defense_effectiveness"] = (SIM_STATE["successful_defenses"] / SIM_STATE["defense_actions_count"]) * 100
+        else:
+            SIM_STATE["defense_effectiveness"] = 0.0
+
+        # Dynamic dwell time
+        SIM_STATE["estimated_dwell_time"] = get_dwell_time(SIM_STATE["compromised_count"])
+
+        render_kpi_cards(
+            SIM_STATE["critical_alerts"],
+            SIM_STATE["sqli_detected"],
+            SIM_STATE["recon_events"],
+            SIM_STATE["discovery_events"],
+            SIM_STATE["risk_score"],
+            SIM_STATE["incident_priority"],
+            SIM_STATE["incident_status"],
+            SIM_STATE["attack_success_rate"],
+            SIM_STATE["defense_effectiveness"],
+            SIM_STATE["attacker_profile"],
+            SIM_STATE["estimated_dwell_time"],
+            SIM_STATE["high_severity_events"]
+        )
+    else:
+        st.info("▶ Run the simulation to populate SOC metrics.")
 
 # Performance recalc at module level
 if SIM_STATE["attack_attempts"] > 0:
@@ -1790,92 +2324,135 @@ if SIM_STATE["attack_attempts"] > 0:
 else:
     attack_success_rate = 0
 
-
 # ------------------------------------------
-# ATTACK TIMELINE
+# ATTACK TIMELINE (Overview workspace)
 # ------------------------------------------
-st.markdown("## 📊 Attack Timeline")
-if st.session_state.simulation_started:
-    selected_threat = st.selectbox(
-        "Filter Threat Level",
-        ["ALL", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
-        key="threat_filter"
-    )
+if workspace == "Overview":
+    st.markdown("## 📊 Attack Timeline")
+    if st.session_state.simulation_started:
+        selected_threat = st.selectbox(
+            "Filter Threat Level",
+            ["ALL", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
+            key="threat_filter"
+        )
 
-    fig_mitre = None
-    timeline_df = pd.DataFrame()
+        timeline_df = pd.DataFrame()
 
-    if SIM_STATE["timeline_data"]:
-        timeline_df = build_timeline_df(SIM_STATE["structured_events"])
+        if SIM_STATE["timeline_data"]:
+            timeline_df = build_timeline_df(SIM_STATE["structured_events"])
 
-        if "timeline_weight" in timeline_df.columns:
-            timeline_df = timeline_df.sort_values(
-                by="timeline_weight",
-                ascending=False
+            if "timeline_weight" in timeline_df.columns:
+                timeline_df = timeline_df.sort_values(
+                    by="timeline_weight",
+                    ascending=False
+                )
+            threat_numeric = {
+                "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4
+            }
+
+            timeline_df["ThreatScore"] = timeline_df["Threat"].map(threat_numeric)
+            timeline_df = filter_timeline(timeline_df, selected_threat)
+            
+            st.markdown("### 📋 Quick View (Top 10 Events)")
+            st.dataframe(timeline_df.head(10), use_container_width=True)
+            
+            with st.expander("📋 View Full Filtered Timeline Log"):
+                st.dataframe(timeline_df, use_container_width=True)
+                
+            fig_trend = px.line(
+                timeline_df.head(10),
+                x="Time",
+                y="ThreatScore",
+                color="Stage",
+                title="Threat Escalation Trend (Quick View)"
             )
-        threat_numeric = {
-            "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4
-        }
+            fig_trend.update_layout(
+                paper_bgcolor="#071028",
+                plot_bgcolor="#071028",
+                font_color="white"
+            )
+            st.plotly_chart(fig_trend, use_container_width=True, config={"responsive": True})
 
-        timeline_df["ThreatScore"] = timeline_df["Threat"].map(threat_numeric)
-        timeline_df = filter_timeline(
-            timeline_df,
-            selected_threat
-        )
-        st.dataframe(timeline_df.head(25), use_container_width=True)
-        fig_trend = px.line(
-            timeline_df.head(25),
-            x="Time",
-            y="ThreatScore",
-            color="Stage",
-            title="Threat Escalation Trend"
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
-        mitre_df = build_mitre_table(
-            technique_counts
-        )
-        st.markdown("## 🎯 MITRE ATT&CK Technique Frequency")
+        if SIM_STATE["structured_events"]:
+            full_unfiltered_df = build_timeline_df(SIM_STATE["structured_events"])
+            csv_data = export_soc_report(full_unfiltered_df)
+            
+            import json
+            class SOCJSONEncoder(json.JSONEncoder):
+                def default(self, obj):
+                    if isinstance(obj, set):
+                        return list(obj)
+                    return super().default(obj)
+                    
+            # Create a copy of the simulation state and remove the self-referential "metrics" key inside the "metrics" dictionary
+            export_data = {}
+            for k, v in st.session_state.simulation_state.items():
+                if k == "metrics":
+                    # Copy the metrics dict but exclude the self-referential key
+                    export_data[k] = {mk: mv for mk, mv in v.items() if mk != "metrics"}
+                else:
+                    export_data[k] = v
+            json_data = json.dumps(export_data, cls=SOCJSONEncoder, indent=2)
+            
+            dl_col1, dl_col2 = st.columns(2)
+            with dl_col1:
+                st.download_button(
+                    label="📥 Download CSV SOC Report",
+                    data=csv_data,
+                    file_name="soc_attack_timeline.csv",
+                    mime="text/csv",
+                    key="download_soc_report"
+                )
+            with dl_col2:
+                st.download_button(
+                    label="📥 Download JSON Telemetry",
+                    data=json_data,
+                    file_name="soc_telemetry_dump.json",
+                    mime="application/json",
+                    key="download_soc_json"
+                )
+    else:
+        st.info("▶ Run the simulation to populate the Attack Timeline.")
+
+# ------------------------------------------
+# MITRE ANALYTICS (MITRE Analytics workspace)
+# ------------------------------------------
+elif workspace == "MITRE Analytics":
+    st.markdown("## 🎯 MITRE ATT&CK Analytics")
+    if st.session_state.simulation_started:
+        mitre_df = build_mitre_table(technique_counts)
         st.dataframe(mitre_df, use_container_width=True)
-        fig_mitre = build_mitre_pie(
-            technique_counts
-        )
-
-    if fig_mitre is not None:
-        st.plotly_chart(
-            fig_mitre,
-            use_container_width=True
-        )
-
-    if not timeline_df.empty:
-        csv_data = export_soc_report(
-            timeline_df
-        )
-
-        st.download_button(
-            label="📥 Download SOC Report",
-            data=csv_data,
-            file_name="soc_attack_timeline.csv",
-            mime="text/csv",
-            key="download_soc_report"
-        )
-
-else:
-    st.info("▶ Run the simulation to populate the Attack Timeline.")
+        fig_mitre = build_mitre_pie(technique_counts)
+        if fig_mitre is not None:
+            fig_mitre.update_layout(
+                paper_bgcolor="#071028",
+                plot_bgcolor="#071028",
+                font_color="white",
+                height=420,
+                margin=dict(l=20, r=20, t=50, b=20)
+            )
+            st.plotly_chart(fig_mitre, use_container_width=True, config={"responsive": True})
+    else:
+        st.info("▶ Run the simulation to view MITRE ATT&CK analytics.")
 
 # --------------------------------------------------
 # POST-SIMULATION: Final priority / status recalc
 # --------------------------------------------------
 
+# Read from SIM_STATE to be fully synchronized across tabs
+comp_c = SIM_STATE["compromised_count"]
+risk_s = SIM_STATE["risk_score"]
+
 if (
-    compromised_count >= 5
-    or SIM_STATE["risk_score"] >= 700
+    comp_c >= 5
+    or risk_s >= 90.0
     or SIM_STATE["lateral_movement_count"] >= 5
 ):
     SIM_STATE["incident_priority"] = "P1"
 
 elif (
-    compromised_count >= 3
-    or SIM_STATE["risk_score"] >= 350
+    comp_c >= 3
+    or risk_s >= 70.0
     or SIM_STATE["discovery_events"] >= 5
 ):
     SIM_STATE["incident_priority"] = "P2"
@@ -1886,7 +2463,7 @@ else:
 SIM_STATE["incident_status"] = "MONITORING"
 
 if (
-    compromised_count >= 5
+    comp_c >= 5
     or (
         SIM_STATE["lateral_movement_count"] >= 4
         and SIM_STATE["high_severity_events"] >= 10
@@ -1895,16 +2472,13 @@ if (
     SIM_STATE["incident_status"] = "BREACH CONFIRMED"
 
 elif (
-    SIM_STATE["risk_score"] >= 250
-    or compromised_count >= 3
+    risk_s >= 70.0
+    or comp_c >= 3
 ):
     SIM_STATE["incident_status"] = "ACTIVE INCIDENT"
 
-estimated_dwell_time = (
-    (compromised_count * 8)
-    + (SIM_STATE["lateral_movement_count"] * 6)
-    + (SIM_STATE["discovery_events"] * 3)
-)
+estimated_dwell_time = get_dwell_time(comp_c)
+SIM_STATE["estimated_dwell_time"] = estimated_dwell_time
 
 campaign_diversity_score = min(
     100,
@@ -1918,6 +2492,7 @@ campaign_diversity_score = min(
         SIM_STATE["lateral_movement_count"] * 3
     )
 )
+SIM_STATE["campaign_diversity_score"] = campaign_diversity_score
 SIM_STATE["anomaly_pressure_score"] = min(
     SIM_STATE["anomaly_pressure_score"],
     100
@@ -2083,13 +2658,10 @@ elif SIM_STATE["incident_priority"] == "P2":
 else:
     SIM_STATE["soc_recommendation"] = "Continue Monitoring"
 
-if st.session_state.simulation_started:
-    st.success("Simulation Completed")
-    st.session_state.simulation_complete = True
+if workspace == "Executive View":
+    st.markdown("## 📋 Executive SOC Summary")
 
-st.markdown("## 📋 Executive SOC Summary")
-
-if st.session_state.simulation_started:
+if workspace == "Executive View" and st.session_state.simulation_started:
 
     # Use dominant_technique variable, not technique_id
     if technique_counts and any(technique_counts.values()):
@@ -2187,19 +2759,19 @@ if st.session_state.simulation_started:
     # SOC ESCALATION REASONING
     # --------------------------------------------------
 
-    if SIM_STATE["incident_priority"] == "CRITICAL":
+    if SIM_STATE["incident_priority"] == "P1":
         escalation_reason = (
             "Critical attack indicators exceed "
             "SOC containment thresholds."
         )
 
-    elif SIM_STATE["incident_priority"] == "HIGH":
+    elif SIM_STATE["incident_priority"] == "P2":
         escalation_reason = (
             "Sustained attacker momentum detected "
             "across multiple attack stages."
         )
 
-    elif SIM_STATE["incident_priority"] == "MEDIUM":
+    elif SIM_STATE["incident_priority"] == "LOW":
         escalation_reason = (
             "Moderate threat activity requiring "
             "continued analyst monitoring."
@@ -2353,7 +2925,7 @@ if st.session_state.simulation_started:
     # --------------------------------------------------
 
     if (
-        SIM_STATE["incident_priority"] == "CRITICAL"
+        SIM_STATE["incident_priority"] == "P1"
         or business_impact_score >= 85
     ):
         response_priority = (
@@ -2361,7 +2933,7 @@ if st.session_state.simulation_started:
         )
 
     elif (
-        SIM_STATE["incident_priority"] == "HIGH"
+        SIM_STATE["incident_priority"] == "P2"
         or business_impact_score >= 65
     ):
         response_priority = (
@@ -2369,7 +2941,7 @@ if st.session_state.simulation_started:
         )
 
     elif (
-        SIM_STATE["incident_priority"] == "MEDIUM"
+        SIM_STATE["incident_priority"] == "LOW"
     ):
         response_priority = (
             "Focused investigation and containment monitoring."
@@ -2555,103 +3127,131 @@ if st.session_state.simulation_started:
         f"{simulation_reliability.lower()}"
     )
 
-    st.info(
-        f"""
-        Total Risk Score: {SIM_STATE["risk_score"]}
+    # -------------------------------------------------------
+    # PANEL 1 — RISK OVERVIEW
+    # -------------------------------------------------------
+    st.markdown("### 🔴 Risk Overview")
+    risk_c1, risk_c2, risk_c3, risk_c4 = st.columns(4)
+    risk_c1.metric("Total Risk Score",       SIM_STATE["risk_score"])
+    risk_c2.metric("Incident Priority",      SIM_STATE["incident_priority"])
+    risk_c3.metric("Incident Status",        SIM_STATE["incident_status"])
+    risk_c4.metric("Compromised Nodes",      compromised_count)
 
-        Incident Priority: {SIM_STATE["incident_priority"]}
+    st.divider()
 
-        Incident Status: {SIM_STATE["incident_status"]}
+    # -------------------------------------------------------
+    # PANEL 2 — THREAT METRICS
+    # -------------------------------------------------------
+    st.markdown("### 🎯 Threat Metrics")
+    thr_c1, thr_c2, thr_c3, thr_c4 = st.columns(4)
+    thr_c1.metric("Dominant Technique",      dominant_technique)
+    thr_c2.metric("Estimated Dwell Time",    f"{estimated_dwell_time} mins")
+    thr_c3.metric("Detection Confidence",    f"{average_alert_confidence:.1f}%")
+    thr_c4.metric("Campaign Diversity",      campaign_diversity_score)
 
-        Compromised Nodes: {compromised_count}
+    thr_c5, thr_c6, thr_c7, thr_c8 = st.columns(4)
+    thr_c5.metric("Threat Momentum",         f"{SIM_STATE['threat_momentum_score']}/100")
+    thr_c6.metric("Threat Volatility",       f"{SIM_STATE['threat_volatility_score']}/100")
+    thr_c7.metric("Anomaly Pressure",        f"{SIM_STATE['anomaly_pressure_score']}/100")
+    thr_c8.metric("Containment Pressure",    f"{SIM_STATE['containment_pressure_score']}/100")
 
-        Dominant Threat Technique: {dominant_technique}
+    st.divider()
 
-        Estimated Dwell Time: {estimated_dwell_time} mins
+    # -------------------------------------------------------
+    # PANEL 3 — SOC PERFORMANCE
+    # -------------------------------------------------------
+    st.markdown("### 🛡️ SOC Performance")
+    soc_c1, soc_c2, soc_c3, soc_c4 = st.columns(4)
+    soc_c1.metric("SOC Stability Index",     f"{soc_stability_index:.1f}/100")
+    soc_c2.metric("Threat Correlation",      f"{SIM_STATE['threat_correlation_score']}/100")
+    soc_c3.metric("Research Consistency",    f"{research_consistency_score:.1f}/100")
+    soc_c4.metric("Research Confidence",     f"{research_confidence_index:.1f}/100")
 
-        Detection Confidence: {average_alert_confidence:.1f}%
-
-        Campaign Diversity Score: {campaign_diversity_score}
-
-        Anomaly Pressure Score: {SIM_STATE["anomaly_pressure_score"]}/100
-
-        Threat Volatility Score: {SIM_STATE["threat_volatility_score"]}/100
-
-        Containment Pressure Score: {SIM_STATE["containment_pressure_score"]}/100
-
-        Threat Momentum Score: {SIM_STATE["threat_momentum_score"]}/100
-
-        SOC Stability Index: {soc_stability_index:.1f}/100
-
-        Research Consistency Score: {research_consistency_score:.1f}/100
-
-        Threat Correlation Score: {SIM_STATE["threat_correlation_score"]}/100
-
-        Threat Sophistication Score: {threat_sophistication_score}/100
-
-        Campaign Classification: {campaign_classification}
-
-        Threat Actor Maturity: {threat_actor_maturity:.1f}/100
-
-        Operational Discipline: {operational_discipline}
-
-        Attacker Intent: {attacker_intent}
-
-        Adversary Behavioral Narrative:
-        {adversary_behavior}
-
-        Analyst Verdict: {analyst_verdict}
-
-        SOC Escalation Reasoning: {escalation_reason}
-
-        Business Impact Score: {business_impact_score:.1f}/100
-
-        Executive Impact Assessment: {executive_impact}
-
-        Response Priority: {response_priority}
-
-        Containment Urgency: {containment_urgency:.1f}/100
-
-        Executive Decision Narrative:
-        {executive_decision_narrative}
-
-        Campaign Progression Narrative:
-        {campaign_progression}
-
-        SOC Investigation Narrative:
-        {soc_investigation_narrative}
-
-        Executive Threat Briefing:
-        {executive_threat_briefing}
-
-        Incident Chronology:
-        {incident_chronology}
-
-        Research Confidence Index:
-        {research_confidence_index:.1f}/100
-
-        Simulation Reliability:
-        {simulation_reliability}
-
-        Dashboard Operational State:
-        {dashboard_operational_state}
-
-        Research Summary Narrative:
-        {research_summary_narrative}
-
-        Threat Actor Confidence: {threat_actor_confidence}%
-
-        Threat Actor Type: {threat_actor_type}
-
-        Campaign Type: {SIM_STATE["campaign_type"]}
-
-        Attacker Profile: {SIM_STATE["attacker_profile"]}
-
-        SOC Recommendation: {SIM_STATE["soc_recommendation"]}
-        """
+    st.markdown("#### 🔒 SOC Recommendation")
+    soc_rec_color = "#ff3b30" if SIM_STATE["incident_priority"] == "P1" else \
+                    "#ff9500" if SIM_STATE["incident_priority"] == "P2" else "#34c759"
+    st.markdown(
+        f'<div style="background:#0d1f36;border-left:5px solid {soc_rec_color};'
+        f'border-radius:10px;padding:16px 20px;color:#e2e8f0;font-size:1.05rem;'
+        f'font-weight:700;margin:10px 0 16px 0;word-break:break-word;white-space:normal;">'
+        f'🔒 {SIM_STATE["soc_recommendation"]}'
+        f'</div>',
+        unsafe_allow_html=True
     )
 
-else:
+    st.divider()
+
+    # -------------------------------------------------------
+    # PANEL 4 — THREAT ACTOR PROFILE
+    # -------------------------------------------------------
+    st.markdown("### 👤 Threat Actor Profile")
+    actor_c1, actor_c2, actor_c3, actor_c4 = st.columns(4)
+    actor_c1.metric("Threat Actor Type",     threat_actor_type)
+    actor_c2.metric("Actor Confidence",      f"{threat_actor_confidence}%")
+    actor_c3.metric("Attacker Profile",      SIM_STATE["attacker_profile"])
+    actor_c4.metric("Campaign Type",         SIM_STATE["campaign_type"])
+
+    act_c5, act_c6, act_c7, act_c8 = st.columns(4)
+    act_c5.metric("Sophistication Score",    f"{threat_sophistication_score}/100")
+    act_c6.metric("Actor Maturity",          f"{threat_actor_maturity:.1f}/100")
+    act_c7.metric("Business Impact",         f"{business_impact_score:.1f}/100")
+    act_c8.metric("Containment Urgency",     f"{containment_urgency:.1f}/100")
+
+    st.divider()
+
+    # -------------------------------------------------------
+    # PANEL 5 — NARRATIVE INTELLIGENCE
+    # -------------------------------------------------------
+    st.markdown("### 📖 Narrative Intelligence")
+
+    def _exec_card(title, body, border_color="#0ea5e9"):
+        return (
+            f'<div style="background:#0a1929;border-left:4px solid {border_color};'
+            f'border-radius:10px;padding:14px 18px;margin-bottom:14px;'
+            f'color:#cbd5e1;font-size:0.93rem;line-height:1.65;'
+            f'word-break:break-word;white-space:normal;">'
+            f'<span style="color:#93c5fd;font-weight:700;font-size:0.88rem;'
+            f'letter-spacing:0.5px;text-transform:uppercase;">{title}</span><br/>'
+            f'<span style="color:#e2e8f0;">{body}</span>'
+            f'</div>'
+        )
+
+    nar_left, nar_right = st.columns(2)
+    with nar_left:
+        st.markdown(
+            _exec_card("Analyst Verdict",          analyst_verdict)
+            + _exec_card("Campaign Classification", campaign_classification, "#f59e0b")
+            + _exec_card("Operational Discipline",  operational_discipline, "#a78bfa")
+            + _exec_card("Incident Chronology",     incident_chronology,    "#34d399"),
+            unsafe_allow_html=True
+        )
+    with nar_right:
+        st.markdown(
+            _exec_card("Executive Impact",          executive_impact,                "#ff3b30")
+            + _exec_card("Response Priority",       response_priority,               "#ff9500")
+            + _exec_card("Attacker Intent",         attacker_intent,                 "#0ea5e9")
+            + _exec_card("SOC Escalation Reasoning",escalation_reason,               "#f43f5e"),
+            unsafe_allow_html=True
+        )
+
+    st.markdown("#### 📋 Executive Threat Briefing")
+    st.markdown(
+        _exec_card("Full Briefing", executive_threat_briefing, "#0ea5e9"),
+        unsafe_allow_html=True
+    )
+
+    with st.expander("📜 Extended Narrative Reports"):
+        st.markdown(
+            _exec_card("Adversary Behavioral Narrative",    adversary_behavior,             "#a78bfa")
+            + _exec_card("Executive Decision Narrative",   executive_decision_narrative,    "#f59e0b")
+            + _exec_card("Campaign Progression Narrative", campaign_progression,            "#34d399")
+            + _exec_card("SOC Investigation Narrative",    soc_investigation_narrative,     "#0ea5e9")
+            + _exec_card("Research Summary",               research_summary_narrative,      "#94a3b8")
+            + _exec_card("Simulation Reliability",         simulation_reliability,          "#64748b"),
+            unsafe_allow_html=True
+        )
+
+elif workspace == "Executive View":
     st.info(
         "▶ Run the simulation to generate the Executive SOC Summary."
     )

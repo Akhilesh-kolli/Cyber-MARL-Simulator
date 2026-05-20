@@ -18,107 +18,45 @@ def render_kpi_cards(
 
     st.markdown("## 🚨 SOC Overview")
 
-    soc1, soc2, soc3, soc4 = st.columns(4)
+    # Shorten profile name if too long
+    profile_short = attacker_profile
+    if attacker_profile == "Advanced Persistent Threat":
+        profile_short = "APT"
+    elif attacker_profile == "Organized Threat Actor":
+        profile_short = "Organized"
+    elif attacker_profile == "Script Kiddie":
+        profile_short = "Script Kid"
 
-    with soc1:
-        st.metric(
-            "Critical Alerts",
-            critical_alerts
-        )
+    # Clean, shortened labels
+    metrics = [
+        {"title": "Critical Alerts", "val": str(critical_alerts)},
+        {"title": "SQLi Events", "val": str(sqli_detected)},
+        {"title": "Recon", "val": str(recon_events)},
+        {"title": "Discovery", "val": str(discovery_events)},
+        {"title": "Risk Score", "val": f"{risk_score}"},
+        {"title": "Priority", "val": str(incident_priority)},
+        {"title": "Status", "val": str(incident_status)},
+        {"title": "Attack Success", "val": f"{attack_success_rate:.1f}%"},
+        {"title": "Defense Eff.", "val": f"{defense_effectiveness:.1f}%"},
+        {"title": "Profile", "val": profile_short},
+        {"title": "Dwell Time", "val": f"{estimated_dwell_time}m"},
+        {"title": "High Severity", "val": str(high_severity_events)},
+    ]
 
-    with soc2:
-        st.metric(
-            "SQLi Events",
-            sqli_detected
-        )
+    cards_html = ""
+    for m in metrics:
+        cards_html += f"""
+        <div class="kpi-flex-card">
+            <div class="kpi-card-title">{m['title']}</div>
+            <div class="kpi-card-value">{m['val']}</div>
+        </div>
+        """
 
-    with soc3:
-        st.metric(
-            "Recon Events",
-            recon_events
-        )
-
-    with soc4:
-        st.metric(
-            "Discovery Events",
-            discovery_events
-        )
-
-    soc5, soc6, soc7 = st.columns(3)
-
-    with soc5:
-        st.metric(
-            "Risk Score",
-            risk_score
-        )
-
-    with soc6:
-        st.metric(
-            "Incident Priority",
-            incident_priority
-        )
-
-    with soc7:
-        st.metric(
-            "Incident Status",
-            incident_status
-        )
-
-    soc8, soc9, soc10 = st.columns(3)
-
-    with soc8:
-        st.metric(
-            "Attack Success %",
-            f"{attack_success_rate:.1f}%"
-        )
-
-    with soc9:
-        st.metric(
-            "Defense Effectiveness %",
-            f"{defense_effectiveness:.1f}%"
-        )
-
-    with soc10:
-
-        st.markdown(
-            f"""
-            <div style="
-                background:#0f172a;
-                padding:18px;
-                border-radius:14px;
-                border:1px solid #1e293b;
-            ">
-
-            <p style="
-                color:#94a3b8;
-                font-size:12px;
-                margin-bottom:10px;
-            ">
-                Attacker Profile
-            </p>
-
-            <h2 style="
-                color:white;
-                margin:0;
-            ">
-                {attacker_profile}
-            </h2>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    soc11, soc12 = st.columns(2)
-
-    with soc11:
-        st.metric(
-            "Estimated Dwell Time",
-            f"{estimated_dwell_time} mins"
-        )
-
-    with soc12:
-        st.metric(
-            "High Severity Events",
-            high_severity_events
-        )
+    st.markdown(
+        f"""
+        <div class="kpi-flex-grid">
+            {cards_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )

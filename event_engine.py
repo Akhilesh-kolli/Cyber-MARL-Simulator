@@ -133,6 +133,8 @@ def build_event(
     explanation,
     compromised_count,
     step,
+    risk_delta=0,
+    compromise_count_snapshot=0,
 ):
     """
     Single source of truth for every simulation event.
@@ -143,28 +145,30 @@ def build_event(
     safe_technique = technique if technique in VALID_TECHNIQUES else ""
 
     return {
-        "timestamp":            datetime.now().strftime("%H:%M:%S"),
-        "step":                 step,
-        "actor":                actor,
-        "node_id":              node_id,
-        "node_type":            node_type,
-        "service":              service,
-        "technique":            safe_technique,
-        "tactic":               tactic,
-        "mitre_name":           mitre_name,
-        "kill_chain":           kill_chain,
-        "threat":               threat,
-        "port":                 port,
-        "cve":                  cve,
-        "cvss":                 cvss,
-        "status":               status,
-        "vulnerability":        vulnerability,
-        "detection_signature":  detection_signature,
-        "detection_severity":   detection_severity,
-        "detection_confidence": detection_confidence,
-        "timeline_weight":      timeline_weight,
-        "explanation":          explanation,
-        "compromised_count":    compromised_count,
+        "timestamp":                  datetime.now().strftime("%H:%M:%S"),
+        "step":                       step,
+        "actor":                      actor,
+        "node_id":                    node_id,
+        "node_type":                  node_type,
+        "service":                    service,
+        "technique":                  safe_technique,
+        "tactic":                     tactic,
+        "mitre_name":                 mitre_name,
+        "kill_chain":                 kill_chain,
+        "threat":                     threat,
+        "port":                       port,
+        "cve":                        cve,
+        "cvss":                       cvss,
+        "status":                     status,
+        "vulnerability":              vulnerability,
+        "detection_signature":        detection_signature,
+        "detection_severity":         detection_severity,
+        "detection_confidence":       detection_confidence,
+        "timeline_weight":            timeline_weight,
+        "explanation":                explanation,
+        "compromised_count":          compromised_count,
+        "risk_delta":                 risk_delta,
+        "compromise_count_snapshot":  compromise_count_snapshot,
     }
 
 
@@ -173,40 +177,19 @@ def format_event_log(event):
     Render a structured event dict into a human-readable log line.
     Reads directly from event fields — zero string parsing.
     """
-    parts = [f"[{event['timestamp']}]"]
+    timestamp = event.get("timestamp", datetime.now().strftime("%H:%M:%S"))
+    stage = event.get("kill_chain", "UNKNOWN")
+    node_type = event.get("node_type", "Unknown")
+    node_id = event.get("node_id", -1)
+    severity = event.get("threat", "INFO")
+    technique = event.get("technique", "None") or "None"
+    cve = event.get("cve", "N/A")
+    risk_delta = event.get("risk_delta", 0)
+    compromise_count = event.get("compromise_count_snapshot", event.get("compromised_count", 0))
+    explanation = event.get("explanation", "")
 
-    if event["actor"] == "attacker":
-        parts.append(f"Attack Node {event['node_id']}")
-
-        if event["status"] == "success":
-            if event["port"]:
-                parts.append(f"Port {event['port']} Open")
-            if event.get("vulnerability"):
-                parts.append(f"HTTP 200 | {event['vulnerability']}")
-        else:
-            parts.append("Service Unreachable")
-
-        if event["technique"]:
-            parts.append(
-                f"{event['technique']} {event['mitre_name']} [{event['tactic']}]"
-            )
-
-        parts.append(f"Stage: {event['kill_chain']}")
-        parts.append(f"Threat: {event['threat']}")
-
-        if event["cve"] and event["cve"] != "N/A":
-            parts.append(f"CVE: {event['cve']}")
-        if event["cvss"] is not None:
-            parts.append(f"CVSS: {event['cvss']}")
-        if event["detection_signature"] and event["detection_signature"] != "N/A":
-            parts.append(f"ALERT: {event['detection_signature']}")
-
-    else:
-        parts.append("Defender Action")
-        parts.append(f"Stage: {event['kill_chain']}")
-        parts.append(f"Threat: {event['threat']}")
-
-    parts.append(f"Reason: {event['explanation']}")
-    parts.append(f"Compromised Nodes: {event['compromised_count']}")
-
-    return " | ".join(parts)
+    return (
+        f"[{timestamp}] [{stage.upper()}] Node: {node_type} ({node_id}) | "
+        f"Severity: {severity} | Tech: {technique} | CVE: {cve} | "
+        f"Risk: {risk_delta:+d} | Compromised: {compromise_count}/6 | {explanation}"
+    )

@@ -26,16 +26,10 @@ def build_timeline_df(events: list) -> pd.DataFrame:
     Build timeline DataFrame from structured event list.
     Returns columns: Time, Stage, Threat, Event, ThreatScore, Actor
     """
+    from event_engine import format_event_log
     rows = []
     for e in events:
-        # Build a clean event label from structured fields
-        if e["actor"] == "attacker":
-            label = f"Attack Node {e['node_id']}"
-            if e["technique"]:
-                label += f" | {e['technique']} [{e['tactic']}]"
-            label += f" | Stage: {e['kill_chain']} | Threat: {e['threat']}"
-        else:
-            label = f"Defender Action | Stage: {e['kill_chain']} | Threat: {e['threat']}"
+        label = format_event_log(e)
 
         rows.append({
             "Time":        e["timestamp"],
@@ -58,12 +52,20 @@ def build_chart_df(
     step_history:        list,
     threat_history:      list,
     compromise_history:  list,
+    defense_history:     list = None,
+    momentum_history:    list = None,
 ) -> pd.DataFrame:
-    return pd.DataFrame({
+    data = {
         "Step":              step_history,
         "Critical Alerts":   threat_history,
         "Compromised Nodes": compromise_history,
-    })
+    }
+    if defense_history is not None:
+        data["Successful Defenses"] = defense_history
+    if momentum_history is not None:
+        data["Threat Momentum"] = momentum_history
+    return pd.DataFrame(data)
+
 
 
 # --------------------------------------------------
@@ -90,8 +92,10 @@ def build_mitre_pie(technique_counts: dict):
         values="Frequency",
         title="MITRE ATT&CK Technique Distribution",
         color_discrete_sequence=px.colors.sequential.Blues_r,
+        hole=0.35,
     )
     return fig
+
 
 
 # --------------------------------------------------

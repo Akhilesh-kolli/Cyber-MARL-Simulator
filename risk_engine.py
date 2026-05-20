@@ -139,3 +139,131 @@ def get_dominant_technique(technique_counts):
     if not technique_counts or not any(technique_counts.values()):
         return "N/A"
     return max(technique_counts, key=technique_counts.get)
+
+
+STAGE_RANGES = {
+    "Recon": (20, 45),
+    "Reconnaissance": (20, 45),
+    "Discovery": (20, 45),
+    "Initial Access": (45, 70),
+    "Lateral Movement": (70, 90),
+    "Privilege Escalation": (70, 90),
+    "Persistence": (70, 90),
+    "Exfiltration": (90, 100),
+    "Idle": (0, 20),
+}
+
+
+def calculate_bounded_risk_score(
+    nodes,
+    lateral_movement_count,
+    privilege_escalation_count,
+    persistence_score,
+    containment_failures,
+    events,
+    dwell_time,
+    current_stage,
+):
+    """
+    Multi-factor bounded risk scoring with dynamic soft caps mapping to campaign ranges.
+    """
+    role_weights = {
+        "DomainController": 5,
+        "Database": 4,
+        "Server": 3,
+        "Firewall": 2,
+        "Workstation": 2
+    }
+
+    node_score = 0
+    if isinstance(nodes, dict):
+        for ninfo in nodes.values():
+            if ninfo.get("status") in ("compromised", "contained"):
+                role = ninfo.get("role", "Workstation")
+                node_score += role_weights.get(role, 2)
+    elif isinstance(nodes, list):
+        for ninfo in nodes:
+            if ninfo.get("status") in ("compromised", "contained"):
+                role = ninfo.get("role", "Workstation")
+                node_score += role_weights.get(role, 2)
+
+    cvss_sum = 0
+    if events:
+        for e in events:
+            if e.get("status") == "success":
+                cvss = e.get("cvss")
+                if cvss and isinstance(cvss, (int, float)):
+                    cvss_sum += cvss
+
+    raw_score = (
+        node_score * 8
+        + lateral_movement_count * 5
+        + privilege_escalation_count * 8
+        + persistence_score * 3
+        + containment_failures * 6
+        + cvss_sum * 1.5
+        + dwell_time * 0.5
+    )
+
+    import math
+    if raw_score <= 0:
+        val = 0.0
+    else:
+        val = 100.0 / (1.0 + math.exp(-raw_score / 40.0))
+
+    min_r, max_r = STAGE_RANGES.get(current_stage, (20, 100))
+    bounded_val = min_r + (val / 100.0) * (max_r - min_r)
+    return round(bounded_val, 1)
+
+
+def get_next_attack_stage(
+    current_stage,
+    step,
+    compromised_count,
+    logged_techniques,
+    dc_compromised,
+    db_or_srv_root,
+    persistence_score,
+):
+    """
+    Enforce sequential, step-by-step campaign stage progression.
+    Reconnaissance -> Discovery -> Initial Access -> Lateral Movement -> Privilege Escalation -> Persistence -> Exfiltration.
+    """
+    if not current_stage or current_stage == "Idle":
+        return "Reconnaissance"
+
+    # Normalize name to full form
+    if current_stage == "Recon":
+        current_stage = "Reconnaissance"
+
+    if current_stage == "Reconnaissance":
+        if step > 0 or "T1046" in logged_techniques or "T1595" in logged_techniques:
+            return "Discovery"
+        return "Reconnaissance"
+
+    if current_stage == "Discovery":
+        if compromised_count >= 1:
+            return "Initial Access"
+        return "Discovery"
+
+    if current_stage == "Initial Access":
+        if compromised_count >= 2:
+            return "Lateral Movement"
+        return "Initial Access"
+
+    if current_stage == "Lateral Movement":
+        if db_or_srv_root or compromised_count >= 3:
+            return "Privilege Escalation"
+        return "Lateral Movement"
+
+    if current_stage == "Privilege Escalation":
+        if persistence_score >= 4 or compromised_count >= 4:
+            return "Persistence"
+        return "Privilege Escalation"
+
+    if current_stage == "Persistence":
+        if dc_compromised and step >= 15:
+            return "Exfiltration"
+        return "Persistence"
+
+    return current_stage
