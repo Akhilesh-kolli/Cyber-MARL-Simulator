@@ -171,7 +171,9 @@ reset_button = st.sidebar.button("🔄 Reset Simulation")
 
 if reset_button:
     reset_entire_simulation(st)
+    st.session_state.soc_workspace = "Overview"
     st.rerun()
+
 
 if "soc_workspace" not in st.session_state:
     st.session_state.soc_workspace = "Overview"

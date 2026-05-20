@@ -23,8 +23,4 @@ def reset_entire_simulation(st):
     st.session_state.network_graph_fig = None
     st.session_state.alert_fatigue_score = 0
     
-    # 4. If we have any custom threat hunt filters or timelines in streamlit, reset them
-    if "threat_filter" in st.session_state:
-        st.session_state.threat_filter = "ALL"
-    if "soc_workspace" in st.session_state:
-        st.session_state.soc_workspace = "Overview"
+
