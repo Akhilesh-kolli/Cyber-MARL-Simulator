@@ -74,7 +74,11 @@ def render_ioc_panel(state: dict):
         st.dataframe(ioc_df, use_container_width=True)
         
         # Interactive Filter
-        ioc_type_filter = st.selectbox("Filter by Indicator Type", ["ALL", "Network Port", "Adversary Technique"])
+        ioc_type_filter = st.selectbox(
+            "Filter by Indicator Type",
+            ["ALL", "Network Port", "Adversary Technique"],
+            key="ioc_type_filter_selectbox"
+        )
         if ioc_type_filter != "ALL":
             filtered_ioc_df = ioc_df[ioc_df["Type"] == ioc_type_filter]
             st.markdown(f"#### 🛡️ Filtered Indicators: {ioc_type_filter}")

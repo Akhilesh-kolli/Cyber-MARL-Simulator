@@ -38,10 +38,13 @@ def build_timeline_df(events: list) -> pd.DataFrame:
                      timeline_weight (optional)
     """
     try:
-        from event_engine import format_event_log
+        from utils.formatting import format_event_log
     except ImportError:
-        def format_event_log(e):
-            return e.get("message", str(e))
+        try:
+            from event_engine import format_event_log
+        except ImportError:
+            def format_event_log(e):
+                return e.get("message", str(e))
 
     rows = []
     for e in events:
