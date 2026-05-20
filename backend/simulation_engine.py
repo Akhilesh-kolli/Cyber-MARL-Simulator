@@ -15,7 +15,8 @@ from src.marlon.attack_engine import probe_http_service, probe_tcp_service
 from src.marlon.dvwa_tester import test_basic_sqli
 
 from utils.constants import (
-    NODE_MAPPING, VULNERABILITY_DB, DETECTION_RULES, ASSET_CRITICALITY, REAL_SERVICES
+    NODE_MAPPING, VULNERABILITY_DB, DETECTION_RULES, ASSET_CRITICALITY, REAL_SERVICES,
+    SIMULATION_NODES
 )
 from backend.event_bus import build_canonical_event, push_event
 from backend.reward_engine import calculate_step_reward
