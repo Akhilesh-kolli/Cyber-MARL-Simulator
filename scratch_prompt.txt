@@ -1,0 +1,167 @@
+<USER_REQUEST>
+```text
+CYMARL PLATFORM STABILIZATION + RESPONSIVE UI REFACTOR PROMPT
+
+You are now entering PHASE 5.5 — PLATFORM STABILIZATION for the CYBER MARL SOC Platform.
+
+The platform already contains:
+- SOC Overview
+- Threat Hunt
+- IOC Intelligence
+- MITRE Analytics
+- Executive View
+- Attack Timeline
+- Threat Graph
+- Live Threat Feed
+- Executive Narratives
+- Simulation Controls
+- MARL attacker/defender engine
+- Real-time telemetry panels
+
+DO NOT add new features.
+DO NOT redesign aesthetics yet.
+DO NOT add cinematic UI yet.
+
+Your objective is to stabilize, synchronize, normalize, and fully responsify the entire platform architecture before UI/UX expansion.
+
+========================================================
+CRITICAL OBJECTIVE
+========================================================
+
+Transform the current platform from:
+- feature-heavy prototype
+into:
+- stable operational cyber intelligence dashboard
+
+Focus on:
+1. synchronization
+2. responsive rendering
+3. metric realism
+4. layout stability
+5. state consistency
+6. overflow prevention
+7. adaptive scaling
+8. Streamlit rendering discipline
+
+========================================================
+PRIORITY 1 — COMPLETE SYNCHRONIZATION FIX
+========================================================
+
+Current problems observed:
+- compromised nodes mismatch across panels
+- graph state differs from telemetry
+- executive metrics differ from threat logs
+- threat hunt summary differs from attack graph
+- active threats remain static
+- compromised nodes show fixed values
+- logs and graph disagree
+- telemetry derived from different logic paths
+- multiple panels recompute independent values
+
+MANDATORY FIX:
+
+Create ONE centralized canonical simulation state.
+
+Implement:
+simulation_state = {
+    "nodes": {},
+    "events": [],
+    "alerts": [],
+    "timeline": [],
+    "ioc_data": [],
+    "metrics": {},
+    "risk_state": {},
+    "graph_state": {}
+}
+
+ALL PANELS MUST DERIVE DATA ONLY FROM THIS OBJECT
+<truncated 16748 bytes>
+ime
+- business impact weighting
+
+========================================================
+EXECUTIVE METRIC NORMALIZATION
+========================================================
+
+Prevent constant:
+100/100
+
+Use:
+- bounded weighted scaling
+- soft caps
+- percentile scoring
+- dynamic normalization
+
+Target realistic ranges:
+- 20–45 → low campaign
+- 45–70 → medium campaign
+- 70–90 → severe campaign
+- 90+ → critical enterprise incident
+
+========================================================
+SOC REALISM REQUIREMENTS
+========================================================
+
+Threat progression must feel believable.
+
+Attack stages should evolve:
+Reconnaissance
+→ Discovery
+→ Initial Access
+→ Lateral Movement
+→ Privilege Escalation
+→ Persistence
+→ Exfiltration
+
+NOT instant escalation.
+
+========================================================
+LIVE FEED AUTHENTICITY
+========================================================
+
+Threat feed logs must:
+- correlate with graph state
+- correlate with compromised count
+- correlate with ATT&CK mappings
+- correlate with executive view
+
+No fabricated mismatched telemetry.
+
+========================================================
+FINAL ENGINEERING GOAL
+========================================================
+
+After stabilization:
+The platform should behave like:
+- a real SOC platform
+- a synchronized cyber visualization engine
+- a responsive operational dashboard
+
+The system must:
+- resize cleanly
+- synchronize perfectly
+- avoid overflow
+- avoid clipping
+- maintain metric consistency
+- maintain believable threat progression
+
+========================================================
+IMPORTANT
+========================================================
+
+DO NOT:
+- add futuristic animations
+- add cinematic effects
+- redesign colors
+- add unnecessary widgets
+
+FIRST:
+stabilize architecture completely.
+
+ONLY AFTER ALL FIXES:
+move into Phase 6 UI/UX engineering.
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-20T17:52:30+05:30.
+</ADDITIONAL_METADATA>

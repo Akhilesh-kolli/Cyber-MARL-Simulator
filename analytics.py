@@ -28,16 +28,20 @@ def build_timeline_df(events: list) -> pd.DataFrame:
     """
     from event_engine import format_event_log
     rows = []
-    for e in events:
+    cumulative = 0.0
+    for idx, e in enumerate(events):
         label = format_event_log(e)
-
+        base_score = THREAT_NUMERIC.get(e.get("threat", e.get("severity", "LOW")), 0)
+        cumulative += base_score * (1 + idx * 0.04)
+        escalation_score = round(cumulative, 2)
+        
         rows.append({
-            "Time":        e["timestamp"],
-            "Stage":       e["kill_chain"],
-            "Threat":      e["threat"],
+            "Time":        e.get("timestamp", ""),
+            "Stage":       e.get("kill_chain", e.get("event_type", "Unknown")),
+            "Threat":      e.get("threat", e.get("severity", "LOW")),
             "Event":       label,
-            "ThreatScore": THREAT_NUMERIC.get(e["threat"], 0),
-            "Actor":       e["actor"].capitalize(),
+            "ThreatScore": escalation_score,
+            "Actor":       str(e.get("actor", "unknown")).capitalize(),
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame(

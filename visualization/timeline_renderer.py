@@ -20,7 +20,7 @@ class SOCJSONEncoder(json.JSONEncoder):
 def render_timeline_section(state: dict):
     """
     Renders the complete Attack Timeline UI block inside the Overview workspace.
-    Includes filtering dropdown, dataframes, inline trend plot, and CSV/JSON downloads.
+    Includes filtering dropdown, dataframe, inline trend plot, and CSV/JSON downloads.
     """
     metrics = state["metrics"]
     events = state["events"]
@@ -35,7 +35,7 @@ def render_timeline_section(state: dict):
     selected_threat = st.selectbox(
         "Filter Threat Level",
         ["ALL", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
-        key="threat_filter"
+        key="threat_filter_selectbox"
     )
 
     # 1. Build DataFrame
@@ -52,31 +52,41 @@ def render_timeline_section(state: dict):
         # Apply filter
         filtered_df = filter_timeline(timeline_df, selected_threat)
         
-        # Display DataFrame
-        st.markdown("### 📋 Quick View (Top 10 Events)")
-        st.dataframe(filtered_df.head(10), use_container_width=True)
-        
-        with st.expander("📋 View Full Filtered Timeline Log"):
-            st.dataframe(filtered_df, use_container_width=True)
+        # Display DataFrame (exactly once, no double tables/expanders)
+        st.markdown("### 📋 Attack Timeline Log")
+        st.dataframe(filtered_df, use_container_width=True)
             
         # 2. Render plot
         if not filtered_df.empty:
+            # Use a 0-based event index for a smooth, clean x-axis
+            plot_df = filtered_df.head(10).reset_index(drop=True)
+            plot_df["EventIndex"] = range(1, len(plot_df) + 1)
             fig_trend = px.line(
-                filtered_df.head(10),
-                x="Time",
+                plot_df,
+                x="EventIndex",
                 y="ThreatScore",
                 color="Stage",
                 title="Threat Escalation Trend (Quick View)",
-                markers=True
+                markers=True,
+                color_discrete_sequence=px.colors.qualitative.Safe,
             )
             fig_trend.update_layout(
+                autosize=True,
                 paper_bgcolor="#071028",
                 plot_bgcolor="#071028",
                 font_color="white",
-                xaxis=dict(showgrid=True, gridcolor="#1e293b"),
-                yaxis=dict(showgrid=True, gridcolor="#1e293b"),
-                margin=dict(l=20, r=20, t=50, b=20),
-                height=350
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.2,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=10),
+                ),
+                xaxis=dict(showgrid=True, gridcolor="#1e293b", title="Event #"),
+                yaxis=dict(showgrid=True, gridcolor="#1e293b", title="Cumulative Threat Score"),
+                margin=dict(l=10, r=10, t=40, b=50),
+                height=350,
             )
             st.plotly_chart(fig_trend, use_container_width=True, config={"responsive": True})
             
@@ -102,7 +112,7 @@ def render_timeline_section(state: dict):
                 data=csv_data,
                 file_name="soc_attack_timeline.csv",
                 mime="text/csv",
-                key="download_soc_report"
+                key="download_soc_report_button"
             )
         with dl_col2:
             st.download_button(
@@ -110,5 +120,5 @@ def render_timeline_section(state: dict):
                 data=json_data,
                 file_name="soc_telemetry_dump.json",
                 mime="application/json",
-                key="download_soc_json"
+                key="download_soc_json_button"
             )

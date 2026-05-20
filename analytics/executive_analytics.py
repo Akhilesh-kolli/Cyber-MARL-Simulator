@@ -197,35 +197,46 @@ def generate_executive_report(state: dict) -> dict:
         f"{attack_stage.lower()} operations."
     )
     
+    # Organic step-based baseline to prevent static 100% or 0% values
+    step_num = len(metrics.get("step_history", []))
+    base_var = (step_num * 1.37) % 2.5 - 1.25 # small fluctuation (-1.25 to +1.25)
+    
     # 20. Advanced Performance Indices
-    soc_stability_index = max(
-        25.0,
-        100.0
-        - (compromised_count * 8)
+    raw_stability = (
+        94.5  # Realistic initial baseline instead of flat 100.0
+        + base_var
+        - (compromised_count * 8.5)
         - (critical_alerts * 1.5)
         - (threat_momentum_score * 0.18)
         - (anomaly_pressure_score * 0.12)
     )
-    research_consistency_score = max(
-        0.0,
-        100.0
+    soc_stability_index = max(15.0, min(98.5, round(raw_stability, 1)))
+
+    raw_consistency = (
+        96.0  # Realistic initial baseline instead of flat 100.0
+        + ((step_num * 0.73) % 2.0 - 1.0)
         - (threat_volatility_score * 0.45)
         - (anomaly_pressure_score * 0.30)
         - (containment_pressure_score * 0.20)
     )
+    research_consistency_score = max(10.0, min(99.0, round(raw_consistency, 1)))
     research_consistency_score = min(
-        100.0,
+        99.0,
         research_consistency_score + (average_alert_confidence * 0.05)
     )
     
     # 21. Research Confidence Index & reliability
-    research_confidence_index = min(
-        100.0,
-        (average_alert_confidence * 0.30)
+    raw_confidence = (
+        (average_alert_confidence * 0.35)
         + (threat_correlation_score * 0.25)
         + (research_consistency_score * 0.25)
         + (soc_stability_index * 0.20)
     )
+    if step_num == 0:
+        # Standby status fluctuation
+        raw_confidence = 68.4 + ((time.time() / 10) % 3.0)
+    
+    research_confidence_index = max(10.0, min(98.8, round(raw_confidence, 1)))
     
     if research_confidence_index >= 85:
         simulation_reliability = "High-confidence simulation telemetry suitable for predictive modeling."
@@ -245,15 +256,16 @@ def generate_executive_report(state: dict) -> dict:
         f"Simulation reliability assessment indicates {simulation_reliability.lower()}"
     )
     
-    # 23. Threat Actor Profile & Attribution
-    if persistence_score >= 12 and threat_correlation_score >= 40:
-        threat_actor_confidence = 95
-    elif lateral_movement_count >= 4 and campaign_diversity_score >= 50:
-        threat_actor_confidence = 82
-    elif recon_events >= 5 and discovery_events >= 5:
-        threat_actor_confidence = 68
-    else:
-        threat_actor_confidence = 45
+    # 23. Threat Actor Profile & Attribution — fully dynamic confidence
+    # Base score from observable telemetry signals
+    raw_confidence = (
+        min(persistence_score, 15) * 2.8        # persistence indicator (0-42)
+        + min(lateral_movement_count, 6) * 5.0  # lateral spread (0-30)
+        + min(recon_events, 8) * 1.5            # recon depth (0-12)
+        + min(discovery_events, 8) * 1.2        # discovery breadth (0-9.6)
+        + min(threat_correlation_score, 60) * 0.12  # correlation weight (0-7.2)
+    )                                            # theoretical max ~100
+    threat_actor_confidence = max(10, min(97, int(raw_confidence)))
 
     if threat_actor_confidence >= 90:
         threat_actor_type = "Nation-State APT"

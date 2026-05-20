@@ -27,7 +27,7 @@ def render_threat_hunt_panel(state: dict):
     hunt_c2.metric("Observed Ports", summary["observed_ports_count"])
     hunt_c3.metric("Compromised Assets", summary["compromised_assets_count"])
 
-    with st.expander("🔍 Threat Hunt Details", expanded=False):
+    with st.expander("🔍 Threat Hunt Details", expanded=False, key="threat_hunt_details_expander"):
         det_c1, det_c2, det_c3 = st.columns(3)
         det_c1.metric("Alert Fatigue Score", f"{summary['alert_fatigue_score']:.1f}")
         det_c2.metric("Successful Defenses", summary["successful_defenses"])
@@ -62,7 +62,7 @@ def render_ioc_panel(state: dict):
     Renders the IOC Intelligence Registry workspace.
     """
     st.markdown("## 🧠 IOC Intelligence Registry")
-    events = state["events"]
+    events = state.get("events", [])
     
     if not events and not state.get("simulation", {}).get("running", False):
         st.info("▶ Run the simulation to populate IOC Intelligence.")
@@ -70,9 +70,6 @@ def render_ioc_panel(state: dict):
         
     ioc_df = IOCEngine.generate_registry_df(events)
     if not ioc_df.empty:
-        st.markdown("### 🔍 Complete Threat Indicator Registry")
-        st.dataframe(ioc_df, use_container_width=True)
-        
         # Interactive Filter
         ioc_type_filter = st.selectbox(
             "Filter by Indicator Type",
@@ -80,8 +77,10 @@ def render_ioc_panel(state: dict):
             key="ioc_type_filter_selectbox"
         )
         if ioc_type_filter != "ALL":
-            filtered_ioc_df = ioc_df[ioc_df["Type"] == ioc_type_filter]
-            st.markdown(f"#### 🛡️ Filtered Indicators: {ioc_type_filter}")
-            st.dataframe(filtered_ioc_df, use_container_width=True)
+            filtered_df = ioc_df[ioc_df["Type"] == ioc_type_filter]
+        else:
+            filtered_df = ioc_df
+            
+        st.dataframe(filtered_df, use_container_width=True)
     else:
         st.info("No IOCs detected during current simulation steps.")

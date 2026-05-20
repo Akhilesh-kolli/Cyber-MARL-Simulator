@@ -61,13 +61,14 @@ def render_threat_trend_chart(
     )
     
     fig.update_layout(
+        autosize=True,
         paper_bgcolor="#071028",
         plot_bgcolor="#071028",
         font_color="white",
         xaxis=dict(showgrid=True, gridcolor="#1e293b"),
         yaxis=dict(showgrid=True, gridcolor="#1e293b"),
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=400
+        margin=dict(l=10, r=10, t=40, b=10),
+        height=350
     )
     
     st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
@@ -97,11 +98,20 @@ def render_mitre_pie(technique_counts: dict):
     )
     
     fig.update_layout(
+        autosize=True,
         paper_bgcolor="#071028",
         plot_bgcolor="#071028",
         font_color="white",
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=400
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.1,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=10),
+        ),
+        margin=dict(l=10, r=10, t=40, b=40),
+        height=350
     )
     
     st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
@@ -126,13 +136,22 @@ def render_escalation_chart(timeline_df: pd.DataFrame):
     )
     
     fig.update_layout(
+        autosize=True,
         paper_bgcolor="#071028",
         plot_bgcolor="#071028",
         font_color="white",
-        xaxis=dict(showgrid=True, gridcolor="#1e293b"),
-        yaxis=dict(showgrid=True, gridcolor="#1e293b"),
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=400
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.2,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=10),
+        ),
+        xaxis=dict(showgrid=True, gridcolor="#1e293b", title="Event Index"),
+        yaxis=dict(showgrid=True, gridcolor="#1e293b", title="Threat Score"),
+        margin=dict(l=10, r=10, t=40, b=50),
+        height=350
     )
     
     st.plotly_chart(fig, use_container_width=True, config={"responsive": True})

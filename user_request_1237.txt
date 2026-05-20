@@ -1,0 +1,162 @@
+<USER_REQUEST>
+CYMARL — COMPLETE BACKEND HARDENING + ARCHITECTURE STABILIZATION PROMPT
+
+You are now entering the FINAL BACKEND HARDENING PHASE for the CYMARL Cyber SOC Simulation Platform.
+
+IMPORTANT:
+This phase is NOT about UI redesign.
+This phase is NOT about visual enhancements.
+This phase is NOT about adding new features.
+
+This phase is ONLY about:
+- backend stabilization
+- state integrity
+- deterministic telemetry
+- architecture cleanup
+- synchronization
+- modularization
+- simulation reliability
+- render consistency
+
+The goal is to transform the current feature-rich prototype into a stable cyber operations platform foundation BEFORE UI/UX refinement begins.
+
+========================================================
+MANDATORY OBJECTIVE
+========================================================
+
+Transform CYMARL from:
+- feature-rich but unstable dashboard
+
+into:
+- stable modular cyber simulation platform
+
+ALL analytics, telemetry, graphs, metrics, logs, executive reports, timelines, and SOC views MUST derive from ONE authoritative simulation state system.
+
+========================================================
+PRIORITY 1 — COMPLETE STATE SYNCHRONIZATION ENGINE
+========================================================
+
+CURRENT CRITICAL PROBLEMS:
+- compromised node counts mismatch
+- graph differs from telemetry
+- standby mode displays active metrics
+- stale values persist after reset
+- executive metrics disagree with overview
+- timeline counts differ from cards
+- threat hunt differs from graph
+- active threats show static values
+- duplicated metric calculations
+- inconsistent risk scores
+- simulation completion state corrupted
+- reset pipeline incomplete
+- rerender causes stale metrics
+
+MANDATORY FIX:
+Implement ONE canonical authoritative simulation state object.
+
+========================================================
+AUTHORITATIVE STATE MODEL
+========================================================
+
+Implement:
+
+simulation_state = {
+    "simulation": {
+        "status": "initialized|ready|running|completed|r
+<truncated 7730 bytes>
+==========
+
+Graph MUST render ONLY from:
+simulation_state["nodes"]
+
+NOT from:
+- counters
+- timeline aggregates
+- cached values
+
+Graph must ALWAYS match:
+- compromised counts
+- telemetry
+- executive metrics
+- threat hunt summary
+
+========================================================
+TELEMETRY CONSISTENCY
+========================================================
+
+Threat Feed
+Timeline
+Logs
+Executive Analytics
+SOC Metrics
+
+must all reference SAME events.
+
+NO fabricated or mismatched telemetry allowed.
+
+========================================================
+PLACEHOLDER / ZERO METRIC FIX
+========================================================
+
+Current issue:
+- IOC intelligence shows zeros
+- Threat Hunt Summary inconsistent
+- Detection Engineering placeholders
+- metrics initialize before simulation data exists
+
+MANDATORY FIX:
+Implement:
+- safe initialization
+- state-aware rendering
+- null-safe aggregation
+- telemetry guards
+
+Prevent:
+- placeholder rendering
+- zero-value corruption
+- premature rendering
+
+========================================================
+CONFIGURATION CENTRALIZATION
+========================================================
+
+Move ALL hardcoded values into:
+config.py / constants.py
+
+Examples:
+- thresholds
+- risk weights
+- color mappings
+- severity mappings
+- escalation rules
+- timing controls
+- alert limits
+- graph settings
+
+========================================================
+FINAL ENGINEERING GOAL
+========================================================
+
+After this backend hardening phase:
+
+The platform MUST:
+- maintain one authoritative state
+- synchronize all telemetry
+- maintain deterministic metrics
+- survive reruns cleanly
+- reset cleanly
+- avoid stale values
+- avoid duplicated calculations
+- avoid state corruption
+- support future UI/UX scaling safely
+
+The backend should behave like:
+- enterprise cyber simulation infrastructure
+NOT:
+- loosely connected dashboard widgets
+
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-20T18:57:40+05:30.
+</ADDITIONAL_METADATA>

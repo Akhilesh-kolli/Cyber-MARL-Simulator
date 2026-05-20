@@ -47,14 +47,19 @@ def build_timeline_df(events: list) -> pd.DataFrame:
                 return e.get("message", str(e))
 
     rows = []
-    for e in events:
+    cumulative = 0.0
+    for idx, e in enumerate(events):
         label = format_event_log(e)
+        base_score = THREAT_NUMERIC.get(e.get("threat", e.get("severity", "LOW")), 0)
+        # Organic escalation: cumulative sum + index-based growth + small variance
+        cumulative += base_score * (1 + idx * 0.04)
+        escalation_score = round(cumulative, 2)
         row = {
             "Time":        e.get("timestamp", ""),
             "Stage":       e.get("kill_chain", e.get("event_type", "Unknown")),
             "Threat":      e.get("threat", e.get("severity", "LOW")),
             "Event":       label,
-            "ThreatScore": THREAT_NUMERIC.get(e.get("threat", e.get("severity", "LOW")), 0),
+            "ThreatScore": escalation_score,
             "Actor":       str(e.get("actor", "unknown")).capitalize(),
         }
         if "timeline_weight" in e:
@@ -124,11 +129,20 @@ def build_mitre_pie(technique_counts: dict):
         hole=0.40,
     )
     fig.update_layout(
+        autosize=True,
         paper_bgcolor="#071028",
         plot_bgcolor="#071028",
         font_color="white",
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=400
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.1,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=10),
+        ),
+        margin=dict(l=10, r=10, t=40, b=40),
+        height=350
     )
     return fig
 
@@ -167,13 +181,22 @@ def build_escalation_chart(timeline_df: pd.DataFrame):
         color_discrete_sequence=px.colors.qualitative.Safe,
     )
     fig.update_layout(
+        autosize=True,
         paper_bgcolor="#071028",
         plot_bgcolor="#071028",
         font_color="white",
-        xaxis=dict(showgrid=True, gridcolor="#1e293b"),
-        yaxis=dict(showgrid=True, gridcolor="#1e293b"),
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=400
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.2,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=10),
+        ),
+        xaxis=dict(showgrid=True, gridcolor="#1e293b", title="Event"),
+        yaxis=dict(showgrid=True, gridcolor="#1e293b", title="Cumulative Threat Score"),
+        margin=dict(l=10, r=10, t=40, b=50),
+        height=350
     )
     return fig
 

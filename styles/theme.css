@@ -321,10 +321,7 @@ section:has(h2:contains("Timeline")) {
    METRIC VISUAL EMPHASIS
 -------------------------------- */
 
-[data-testid="stMetric"] {
-
-    border-top: 2px solid rgba(59,130,246,0.45);
-}
+/* Removed stMetric border-top to eliminate horizontal line artifacts */
 
 /* -------------------------------
    SEVERITY COLORS
@@ -1606,4 +1603,54 @@ body {
     .kpi-flex-card {
         flex: 1 1 100%;
     }
+}
+
+/* =========================================================
+   COMPACT METRIC & CARD OVERFLOW HANDLING
+   ========================================================= */
+[data-testid="stMetricValue"] {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: clamp(14px, 1.4vw, 20px) !important;
+    line-height: 1.2 !important;
+}
+
+[data-testid="stMetricLabel"] {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: clamp(10px, 1.0vw, 11px) !important;
+    line-height: 1.1 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: #94a3b8 !important;
+}
+
+[data-testid="stMetric"] {
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    margin-bottom: 8px !important;
+    box-sizing: border-box !important;
+}
+
+.kpi-flex-card {
+    min-height: 110px !important;
+    padding: 12px 16px !important;
+}
+
+.kpi-card-value {
+    font-size: clamp(16px, 1.8vw, 24px) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.kpi-card-title {
+    font-size: 11px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }

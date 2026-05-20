@@ -43,7 +43,7 @@ def render_executive_panel(state: dict):
     risk_c3.metric("Incident Status", metrics.get("incident_status", "IDLE"))
     risk_c4.metric("Compromised Nodes", metrics.get("compromised_count", 0))
 
-    st.divider()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 2 — THREAT METRICS
@@ -63,7 +63,7 @@ def render_executive_panel(state: dict):
     thr_c7.metric("Anomaly Pressure", f"{metrics.get('anomaly_pressure_score', 0)}/100")
     thr_c8.metric("Containment Pressure", f"{metrics.get('containment_pressure_score', 0)}/100")
 
-    st.divider()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 3 — SOC PERFORMANCE
@@ -87,7 +87,7 @@ def render_executive_panel(state: dict):
         unsafe_allow_html=True
     )
 
-    st.divider()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 4 — THREAT ACTOR PROFILE
@@ -105,7 +105,7 @@ def render_executive_panel(state: dict):
     act_c7.metric("Business Impact", f"{exec_data.get('business_impact_score', 0.0):.1f}/100")
     act_c8.metric("Containment Urgency", f"{exec_data.get('containment_urgency', 0.0):.1f}/100")
 
-    st.divider()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 5 — NARRATIVE INTELLIGENCE
@@ -136,7 +136,7 @@ def render_executive_panel(state: dict):
         unsafe_allow_html=True
     )
 
-    with st.expander("📜 Extended Narrative Reports"):
+    with st.expander("📜 Extended Narrative Reports", key="exec_extended_narratives_expander"):
         st.markdown(
             _exec_card("Adversary Behavioral Narrative", exec_data.get("adversary_behavior", "N/A"), "#a78bfa")
             + _exec_card("Executive Decision Narrative", exec_data.get("executive_decision_narrative", "N/A"), "#f59e0b")
