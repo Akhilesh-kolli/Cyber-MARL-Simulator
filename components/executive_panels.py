@@ -7,6 +7,7 @@ Renders the complete Executive SOC Summary workspace, dividing telemetry into fi
 import streamlit as st
 from analytics.mitre_mapper import get_dominant_technique
 from exports.pdf_exporter import generate_soc_pdf_report
+from datetime import datetime
 
 def _exec_card(title, body, border_color="#0ea5e9"):
     return (
