@@ -21,8 +21,8 @@ def display_network_graph(graph_bytes: bytes, placeholder=None):
         return
         
     container = placeholder if placeholder else st
-    
-    with container.container():
-        st.markdown('<div class="graph-card">', unsafe_allow_html=True)
-        st.image(graph_bytes, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Render directly into the provided placeholder/container to avoid nested wrappers
+    container.markdown('<div class="graph-card">', unsafe_allow_html=True)
+    container.image(graph_bytes, use_container_width=True)
+    container.markdown('</div>', unsafe_allow_html=True)

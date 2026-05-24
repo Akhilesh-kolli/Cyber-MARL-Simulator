@@ -36,17 +36,40 @@ def generate_network_graph(nodes_state: dict, env_graph, env_node_types, env_nod
 
     # 3. Colors strictly derived from canonical states
     def get_color(node_id):
-        # Fallback to healthy if node_id not found
         node_info = nodes_state.get(node_id, {})
         status = node_info.get("status", "healthy")
         if status == "compromised":
             return "#ef4444"
         elif status == "contained":
-            return "#eab308"
-        else:
-            return "#22c55e"
+            return "#facc15"
+        elif node_info.get("defender_action") != "None":
+            return "#38bdf8"
+        return "#22c55e"
+
+    def get_size(node_id):
+        node_info = nodes_state.get(node_id, {})
+        status = node_info.get("status", "healthy")
+        base = 2200
+        if status == "compromised":
+            return base + 900
+        if status == "contained":
+            return base + 450
+        return base
 
     colors = [get_color(i) for i in range(env_node_count)]
+    sizes = [get_size(i) for i in range(env_node_count)]
+    edge_colors = []
+    edge_widths = []
+    for u, v in G.edges():
+        if nodes_state.get(u, {}).get("status") == "compromised" or nodes_state.get(v, {}).get("status") == "compromised":
+            edge_colors.append("#f97316")
+            edge_widths.append(3.2)
+        elif nodes_state.get(u, {}).get("status") == "contained" or nodes_state.get(v, {}).get("status") == "contained":
+            edge_colors.append("#fde047")
+            edge_widths.append(2.5)
+        else:
+            edge_colors.append("#64748b")
+            edge_widths.append(1.8)
 
     # 4. Draw Figure
     fig, ax = plt.subplots(figsize=(12, 7))
@@ -55,13 +78,13 @@ def generate_network_graph(nodes_state: dict, env_graph, env_node_types, env_nod
 
     nx.draw_networkx_nodes(
         G, pos, node_color=colors,
-        node_size=2600, edgecolors="#0ea5e9",
-        linewidths=2, ax=ax
+        node_size=sizes, edgecolors="#0ea5e9",
+        linewidths=2.5, ax=ax
     )
 
     nx.draw_networkx_edges(
-        G, pos, edge_color="#334155",
-        width=2, ax=ax
+        G, pos, edge_color=edge_colors,
+        width=edge_widths, ax=ax, alpha=0.9
     )
 
     nx.draw_networkx_labels(

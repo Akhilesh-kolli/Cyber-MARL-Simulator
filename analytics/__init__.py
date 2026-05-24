@@ -54,20 +54,67 @@ def build_timeline_df(events: list) -> pd.DataFrame:
         # Organic escalation: cumulative sum + index-based growth + small variance
         cumulative += base_score * (1 + idx * 0.04)
         escalation_score = round(cumulative, 2)
+        technique = e.get("technique") or e.get("mitre_name") or "N/A"
+        target_node = e.get("node") or e.get("node_type") or "Unknown"
+        source_node = e.get("source") or "Attacker"
+        confidence = e.get("detection_confidence") if e.get("detection_confidence") is not None else e.get("confidence", 0)
+        status = e.get("status", "unknown")
+        summary = e.get("event_summary") or e.get("message", "")
+        if not summary:
+            if e.get("actor") == "defender":
+                summary = f"Defender action executed against {target_node}."
+            elif e.get("kill_chain", "").lower() == "reconnaissance":
+                summary = f"Port scan detected against {target_node}."
+            elif e.get("kill_chain", "").lower() == "discovery":
+                summary = f"Network discovery activity observed on {target_node}."
+            elif e.get("kill_chain", "").lower() == "initial access":
+                summary = f"{technique} attempt against {target_node}."
+            elif e.get("kill_chain", "").lower() == "execution":
+                summary = f"Suspicious service execution on {target_node}."
+            elif e.get("kill_chain", "").lower() == "persistence":
+                summary = f"Persistence behavior detected on {target_node}."
+            elif e.get("kill_chain", "").lower() == "privilege escalation":
+                summary = f"Privilege escalation attempt detected on {target_node}."
+            elif e.get("kill_chain", "").lower() == "lateral movement":
+                summary = f"Lateral movement from {source_node} to {target_node}."
+            elif e.get("kill_chain", "").lower() == "collection":
+                summary = f"Data collection activity observed on {target_node}."
+            elif e.get("kill_chain", "").lower() == "exfiltration":
+                summary = f"Suspicious outbound transfer from {target_node}."
+            elif e.get("kill_chain", "").lower() == "command and control":
+                summary = f"Command and control channel established by {source_node}."
+            elif e.get("kill_chain", "").lower() == "mitigation":
+                summary = f"Defender isolated compromised {target_node}."
+            else:
+                summary = e.get("message", "No summary available.")
+
         row = {
+            "Event ID":    idx + 1,
             "Time":        e.get("timestamp", ""),
             "Stage":       e.get("kill_chain", e.get("event_type", "Unknown")),
+            "Severity":    e.get("threat", e.get("severity", "LOW")),
             "Threat":      e.get("threat", e.get("severity", "LOW")),
+            "Technique":   technique,
+            "Target Node": target_node,
+            "Source Node": source_node,
+            "CVE":         e.get("cve", "N/A"),
+            "Actor":       str(e.get("actor", "unknown")).capitalize(),
+            "Confidence":  confidence,
+            "Status":      status,
+            "Event Summary": summary,
             "Event":       label,
             "ThreatScore": escalation_score,
-            "Actor":       str(e.get("actor", "unknown")).capitalize(),
         }
         if "timeline_weight" in e:
             row["timeline_weight"] = e["timeline_weight"]
         rows.append(row)
 
-    cols = ["Time", "Stage", "Threat", "Event", "ThreatScore", "Actor"]
-    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=cols)
+    cols = [
+        "Event ID", "Time", "Stage", "Severity", "Threat", "Technique",
+        "Target Node", "Source Node", "CVE", "Actor", "Confidence",
+        "Status", "Event Summary", "Event", "ThreatScore"
+    ]
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
 
 
 # ---------------------------------------------------------------------------

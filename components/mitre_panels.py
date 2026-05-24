@@ -19,11 +19,17 @@ def render_mitre_panel(state: dict):
     
     # Check if simulation started
     if not state.get("events") and not state.get("simulation", {}).get("running", False):
-        st.info("▶ Run the simulation to view MITRE ATT&CK analytics.")
+        st.markdown(
+            '<div class="empty-placeholder">&#9654; Run the simulation to view MITRE ATT&CK analytics.</div>',
+            unsafe_allow_html=True,
+        )
         return
         
-    mitre_df = build_mitre_table(technique_counts)
-    st.dataframe(mitre_df, use_container_width=True)
-    
-    # Render Plotly donut chart
+    # Prefer persisted dataframe after simulation to avoid rerender loss
+    if st.session_state.get("mitre_df") is not None:
+        mitre_df = st.session_state.mitre_df
+    else:
+        mitre_df = build_mitre_table(technique_counts)
+
+    # Render Plotly donut chart only (table removed for cleaner UX)
     render_mitre_pie(technique_counts)

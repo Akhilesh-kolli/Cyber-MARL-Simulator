@@ -7,6 +7,7 @@ executive report generation.
 
 from backend.telemetry_engine import update_telemetry_metrics
 from analytics.executive_analytics import generate_executive_report
+from analytics.bounded_metrics import clamp_0_95
 
 def aggregate_state_metrics(state: dict):
     """
@@ -18,7 +19,8 @@ def aggregate_state_metrics(state: dict):
     
     metrics = state["metrics"]
     
-    # 2. Bound all metrics securely at [0, 100]
+    # 2. Bound important analytic metrics using bounded transforms
+    # Use clamp_0_95 to reserve 95-100 for explicit catastrophic conditions
     for key in [
         "anomaly_pressure_score",
         "threat_volatility_score",
@@ -28,7 +30,11 @@ def aggregate_state_metrics(state: dict):
         "persistence_score"
     ]:
         if key in metrics:
-            metrics[key] = max(0, min(100, int(metrics[key])))
+            try:
+                val = float(metrics.get(key) or 0.0)
+            except Exception:
+                val = 0.0
+            metrics[key] = round(clamp_0_95(val), 2)
             
     # 3. Generate executive report narrative elements
     generate_executive_report(state)

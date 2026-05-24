@@ -42,7 +42,10 @@ def update_telemetry_metrics(state: dict):
     ioc_techniques = set()
     compromised_assets = set()
     observed_attack_stages = set()
-    technique_counts = {t: 0 for t in ["T1190", "T1021", "T1046", "T1595"]}
+    technique_counts = {t: 0 for t in [
+        "T1190", "T1021", "T1046", "T1059", "T1078", "T1003", "T1105",
+        "T1562", "T1055", "T1547", "T1486", "T1110", "T1595"
+    ]}
     
     alert_confidence_total = 0.0
     alert_count = 0
@@ -59,6 +62,7 @@ def update_telemetry_metrics(state: dict):
         vuln = e.get("vulnerability") or ""
         port = e.get("port")
         service = e.get("service")
+        tech_id = str(tech).strip().upper() if tech else ""
         
         # Ports
         if port and port not in ("N/A", ""):
@@ -79,12 +83,12 @@ def update_telemetry_metrics(state: dict):
                     compromised_assets.add(service)
             
             # Techniques
-            if tech and tech in technique_counts:
-                technique_counts[tech] += 1
-                ioc_techniques.add(tech)
-            elif tech and tech not in ("", None):
-                technique_counts[tech] = technique_counts.get(tech, 0) + 1
-                ioc_techniques.add(tech)
+            if tech_id and tech_id in technique_counts:
+                technique_counts[tech_id] += 1
+                ioc_techniques.add(tech_id)
+            elif tech_id:
+                technique_counts[tech_id] = technique_counts.get(tech_id, 0) + 1
+                ioc_techniques.add(tech_id)
 
             # Tactic counts
             if "recon" in kill_chain.lower() or "recon" in tactic.lower():
@@ -94,9 +98,10 @@ def update_telemetry_metrics(state: dict):
             if "lateral" in kill_chain.lower() or "lateral" in tactic.lower():
                 lateral_movement_count += 1
                 
-            if "SQL Injection" in vuln or "SQL Injection" in (e.get("message") or ""):
+            sql_message = f"{str(vuln)} {str(e.get('message', ''))}".lower()
+            if tech == "T1190" or any(keyword in sql_message for keyword in ["sql injection", "sqli", "sql payload", "sql query", "injection"]):
                 sqli_detected += 1
-                
+
             # Confidence
             conf = e.get("detection_confidence", 0)
             if conf:
@@ -187,18 +192,45 @@ def update_telemetry_metrics(state: dict):
         metrics["campaign_type"] = "General Intrusion Campaign"
         
     # Recommendation
-    if compromised_count >= 5:
-        metrics["soc_recommendation"] = "Initiate Enterprise Incident Response"
-    elif lateral_movement_count >= 4:
-        metrics["soc_recommendation"] = "Contain Lateral Movement Immediately"
-    elif discovery_events >= 5:
-        metrics["soc_recommendation"] = "Investigate Internal Reconnaissance Activity"
-    elif recon_events >= 5:
-        metrics["soc_recommendation"] = "Increase External Monitoring"
-    elif metrics["incident_priority"] == "P2":
-        metrics["soc_recommendation"] = "Escalate To SOC Team"
+    tactical_actions = []
+    if compromised_count >= 1:
+        tactical_actions.append("Isolate compromised node")
+        tactical_actions.append("Quarantine affected host")
+    if ioc_ports:
+        tactical_actions.append("Block suspicious port access")
+    if lateral_movement_count >= 1:
+        tactical_actions.append("Contain lateral movement")
+    if any("Domain" in asset or "Controller" in asset for asset in compromised_assets):
+        tactical_actions.append("Disable compromised account")
+    if not tactical_actions:
+        tactical_actions.append("Maintain active hunt posture and enrich telemetry")
+
+    executive_actions = []
+    if metrics["incident_priority"] == "P1" or compromised_count >= 5:
+        executive_actions = [
+            "Activate incident response team",
+            "Initiate enterprise escalation",
+            "Notify leadership",
+            "Invoke business continuity",
+            "Assess operational impact"
+        ]
+    elif metrics["incident_priority"] == "P2" or critical_alerts >= 8:
+        executive_actions = [
+            "Escalate to senior SOC leadership",
+            "Validate business-critical asset exposure",
+            "Review executive incident posture",
+            "Prepare leadership notification"
+        ]
     else:
-        metrics["soc_recommendation"] = "Continue Monitoring"
-        
+        executive_actions = [
+            "Maintain senior operations awareness",
+            "Continue monitoring and validate containment",
+            "Review telemetry before executive briefing"
+        ]
+
+    metrics["tactical_recommendation"] = tactical_actions
+    metrics["executive_response_strategy"] = executive_actions
+    metrics["soc_recommendation"] = "; ".join(tactical_actions[:2])
+    
     # Keep the deprecated/aliases key in metrics synced
     metrics["metrics"] = metrics

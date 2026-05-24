@@ -73,7 +73,8 @@ def get_initial_state() -> dict:
             "containment_pressure_score": 0,
             "threat_volatility_score": 0,
             "anomaly_pressure_score": 0,
-            "soc_recommendation": "Awaiting Simulation",
+            "tactical_recommendation": "Awaiting Simulation",
+            "executive_response_strategy": "Awaiting Simulation",
             "attacker_profile": "Unknown",
             "campaign_type": "Unknown Campaign",
             "timeline_data": [],
@@ -90,6 +91,15 @@ def get_initial_state() -> dict:
                 "T1190": 0,
                 "T1021": 0,
                 "T1046": 0,
+                "T1059": 0,
+                "T1078": 0,
+                "T1003": 0,
+                "T1105": 0,
+                "T1562": 0,
+                "T1055": 0,
+                "T1547": 0,
+                "T1486": 0,
+                "T1110": 0,
                 "T1595": 0
             },
             "average_alert_confidence": 0.0,
@@ -151,7 +161,10 @@ def initialize_session_state(st):
     
     # Keep session state flags synced with canonical state status
     status = st.session_state.simulation_state["simulation"]["status"]
-    st.session_state.simulation_started = (status in ("running", "completed"))
+    # `simulation_started` should reflect an actively running simulation only.
+    # Do NOT treat a completed status as "started" to avoid UI thinking
+    # the simulation is still active after it finishes.
+    st.session_state.simulation_started = (status == "running")
     st.session_state.simulation_complete = (status == "completed")
 
     # Authoritative visual and threat metrics cache initialization

@@ -101,7 +101,10 @@ ATTACK_SEVERITY = {
 # --------------------------------------------------
 # VALID TECHNIQUE IDs  (never log UNKNOWN / N/A)
 # --------------------------------------------------
-VALID_TECHNIQUES = {"T1190", "T1021", "T1046", "T1595"}
+VALID_TECHNIQUES = {
+    "T1190", "T1021", "T1046", "T1059", "T1078", "T1003", "T1105",
+    "T1562", "T1055", "T1547", "T1486", "T1110", "T1595"
+}
 INVALID_TECHNIQUE_VALUES = {"N/A", "UNKNOWN", None, ""}
 
 

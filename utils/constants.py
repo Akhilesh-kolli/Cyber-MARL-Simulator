@@ -54,15 +54,41 @@ STAGE_RANGES = {
     "Reconnaissance": (20, 45),
     "Discovery": (20, 45),
     "Initial Access": (45, 70),
-    "Lateral Movement": (70, 90),
-    "Privilege Escalation": (70, 90),
+    "Execution": (50, 75),
     "Persistence": (70, 90),
+    "Privilege Escalation": (70, 90),
+    "Credential Access": (65, 88),
+    "Defense Evasion": (65, 90),
+    "Lateral Movement": (70, 95),
+    "Collection": (75, 97),
     "Exfiltration": (90, 100),
+    "Command and Control": (80, 98),
+    "Mitigation": (0, 50),
 }
 
 # MITRE Techniques
-VALID_TECHNIQUES = {"T1190", "T1021", "T1046", "T1595"}
+VALID_TECHNIQUES = {
+    "T1190", "T1021", "T1046", "T1059", "T1078", "T1003", "T1105",
+    "T1562", "T1055", "T1547", "T1486", "T1110", "T1595"
+}
 INVALID_TECHNIQUE_VALUES = {"N/A", "UNKNOWN", None, ""}
+
+# Attack severity mapping for additional MITRE techniques
+ATTACK_SEVERITY = {
+    "T1190": "CRITICAL",
+    "T1021": "HIGH",
+    "T1046": "MEDIUM",
+    "T1059": "HIGH",
+    "T1078": "HIGH",
+    "T1003": "CRITICAL",
+    "T1105": "HIGH",
+    "T1562": "MEDIUM",
+    "T1055": "HIGH",
+    "T1547": "HIGH",
+    "T1486": "CRITICAL",
+    "T1110": "HIGH",
+    "T1595": "LOW",
+}
 
 # Vulnerability Database
 VULNERABILITY_DB = {

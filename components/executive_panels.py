@@ -23,11 +23,14 @@ def render_executive_panel(state: dict):
     """
     Renders the Executive View workspace from pre-computed metrics and narratives in state.
     """
-    st.markdown("## 📋 Executive SOC Summary")
+    st.markdown("## 📋 Executive Response Strategy")
     
     # Check if simulation started
     if not state.get("events") and not state.get("simulation", {}).get("running", False):
-        st.info("▶ Run the simulation to generate the Executive SOC Summary.")
+        st.markdown(
+            '<div class="empty-placeholder">&#9654; Run the simulation to generate the Executive Response Strategy.</div>',
+            unsafe_allow_html=True,
+        )
         return
 
     metrics = state["metrics"]
@@ -43,8 +46,6 @@ def render_executive_panel(state: dict):
     risk_c3.metric("Incident Status", metrics.get("incident_status", "IDLE"))
     risk_c4.metric("Compromised Nodes", metrics.get("compromised_count", 0))
 
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-
     # -------------------------------------------------------
     # PANEL 2 — THREAT METRICS
     # -------------------------------------------------------
@@ -55,15 +56,14 @@ def render_executive_panel(state: dict):
     thr_c1.metric("Dominant Technique", dominant_tech)
     thr_c2.metric("Estimated Dwell Time", f"{metrics.get('estimated_dwell_time', 0)} mins")
     thr_c3.metric("Detection Confidence", f"{metrics.get('average_alert_confidence', 0.0):.1f}%")
-    thr_c4.metric("Campaign Diversity", exec_data.get("campaign_diversity_score", 0))
+    cdiv = exec_data.get("campaign_diversity_score", 0)
+    thr_c4.metric("Campaign Diversity", f"{float(cdiv):.2f}")
 
     thr_c5, thr_c6, thr_c7, thr_c8 = st.columns(4)
     thr_c5.metric("Threat Momentum", f"{metrics.get('threat_momentum_score', 0)}/100")
     thr_c6.metric("Threat Volatility", f"{metrics.get('threat_volatility_score', 0)}/100")
     thr_c7.metric("Anomaly Pressure", f"{metrics.get('anomaly_pressure_score', 0)}/100")
     thr_c8.metric("Containment Pressure", f"{metrics.get('containment_pressure_score', 0)}/100")
-
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 3 — SOC PERFORMANCE
@@ -75,19 +75,45 @@ def render_executive_panel(state: dict):
     soc_c3.metric("Research Consistency", f"{exec_data.get('research_consistency_score', 0.0):.1f}/100")
     soc_c4.metric("Research Confidence", f"{exec_data.get('research_confidence_index', 0.0):.1f}/100")
 
-    st.markdown("#### 🔒 SOC Recommendation")
-    soc_rec_color = "#ff3b30" if metrics.get("incident_priority") == "P1" else \
+    st.markdown("### 🧭 Executive Response Strategy")
+    exec_rec_color = "#ff3b30" if metrics.get("incident_priority") == "P1" else \
                     "#ff9500" if metrics.get("incident_priority") == "P2" else "#34c759"
+    exec_actions = exec_data.get("executive_actions", [])
+    exec_summary = " · ".join(exec_actions) if exec_actions else "Executive strategy is being formulated based on incident telemetry."
     st.markdown(
-        f'<div style="background:#0d1f36;border-left:5px solid {soc_rec_color};'
-        f'border-radius:10px;padding:16px 20px;color:#e2e8f0;font-size:1.05rem;'
-        f'font-weight:700;margin:10px 0 16px 0;word-break:break-word;white-space:normal;">'
-        f'🔒 {metrics.get("soc_recommendation", "Awaiting Simulation")}'
+        f'<div style="background:#0d1f36;border-left:5px solid {exec_rec_color};'
+        f'border-radius:10px;padding:16px 20px;color:#e2e8f0;font-size:1rem;'
+        f'font-weight:600;margin:10px 0 16px 0;word-break:break-word;white-space:normal;">'
+        f'<strong>Recommended executive actions:</strong> {exec_summary}'
         f'</div>',
         unsafe_allow_html=True
     )
 
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+    with st.expander("🧠 Metric Explainability", expanded=False):
+        st.markdown(
+            "- **Threat Correlation** = unique observed techniques + attack stage diversity + lateral movement - defender successes  ",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "- **Research Consistency** = SOC stability + confidence - volatility + telemetry reliability  ",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "- **Containment Pressure** = active compromised hosts + critical alerts + persistence - successful mitigations  ",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "- **Detection Confidence** = average alert confidence + threat correlation + validated defenses  ",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "- **Threat Momentum** = current threat stage weight + critical activity + attack persistence - defender damping  ",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "- **SOC Stability Index** = baseline SOC resilience - active compromise impact - volatility  ",
+            unsafe_allow_html=True
+        )
 
     # -------------------------------------------------------
     # PANEL 4 — THREAT ACTOR PROFILE
@@ -104,8 +130,6 @@ def render_executive_panel(state: dict):
     act_c6.metric("Actor Maturity", f"{exec_data.get('threat_actor_maturity', 0.0):.1f}/100")
     act_c7.metric("Business Impact", f"{exec_data.get('business_impact_score', 0.0):.1f}/100")
     act_c8.metric("Containment Urgency", f"{exec_data.get('containment_urgency', 0.0):.1f}/100")
-
-    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------------
     # PANEL 5 — NARRATIVE INTELLIGENCE

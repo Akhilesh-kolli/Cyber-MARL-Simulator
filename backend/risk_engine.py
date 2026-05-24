@@ -128,6 +128,15 @@ def get_dominant_technique(technique_counts):
     return max(technique_counts, key=technique_counts.get)
 
 
+from analytics.bounded_metrics import (
+    sigmoid_scale,
+    clamp_0_95,
+    boost_to_catastrophic,
+    weighted_composite_score,
+    entropy_scale,
+)
+
+
 def calculate_bounded_risk_score(
     nodes,
     lateral_movement_count,
@@ -140,6 +149,8 @@ def calculate_bounded_risk_score(
 ):
     """
     Multi-factor bounded risk scoring with dynamic soft caps mapping to campaign ranges.
+    Uses normalized composite contributions and only permits catastrophic saturation
+    when explicit enterprise compromise conditions are satisfied.
     """
     role_weights = {
         "DomainController": 5,
@@ -149,44 +160,80 @@ def calculate_bounded_risk_score(
         "Workstation": 2
     }
 
-    node_score = 0
+    compromised_weight = 0
     if isinstance(nodes, dict):
         for ninfo in nodes.values():
             if ninfo.get("status") in ("compromised", "contained"):
                 role = ninfo.get("role", "Workstation")
-                node_score += role_weights.get(role, 2)
+                compromised_weight += role_weights.get(role, 2)
     elif isinstance(nodes, list):
         for ninfo in nodes:
             if ninfo.get("status") in ("compromised", "contained"):
                 role = ninfo.get("role", "Workstation")
-                node_score += role_weights.get(role, 2)
+                compromised_weight += role_weights.get(role, 2)
 
-    cvss_sum = 0
-    if events:
-        for e in events:
-            if e.get("status") == "success":
-                cvss = e.get("cvss")
-                if cvss and isinstance(cvss, (int, float)):
-                    cvss_sum += cvss
+    # Normalize counts by campaign scale to avoid runaway escalation
+    total_events = len(events) if events else 0
+    unique_techniques = len({str(e.get("technique", "")).upper() for e in events if e})
+    event_scale = max(1, total_events)
 
-    raw_score = (
-        node_score * 8
-        + lateral_movement_count * 5
-        + privilege_escalation_count * 8
-        + persistence_score * 3
-        + containment_failures * 6
-        + cvss_sum * 1.5
-        + dwell_time * 0.5
+    compromise_ratio = min(1.0, compromised_weight / 12.0)
+    critical_ratio = min(1.0, (sum(1 for e in events if e.get("severity") == "CRITICAL") * 1.3) / max(6, event_scale))
+    persistence_ratio = min(1.0, persistence_score / 18.0)
+    exfiltration_ratio = min(1.0, (sum(1 for e in events if e.get("event_type") in ("Exfiltration", "Collection") or e.get("technique") in ("T1105", "T1486")) * 1.2) / max(5, event_scale))
+    failed_defense_ratio = min(1.0, containment_failures / 5.0)
+    anomaly_ratio = min(1.0, ((sum(1 for e in events if e.get("severity") in ("HIGH", "CRITICAL")) * 0.9) + unique_techniques * 0.2) / max(10, event_scale))
+
+    # Compute component scores in [0,100]
+    severity_score = critical_ratio * 100.0
+    compromised_score = compromise_ratio * 100.0
+    persistence_score_norm = persistence_ratio * 100.0
+    exfiltration_score = exfiltration_ratio * 100.0
+    anomaly_score = anomaly_ratio * 100.0
+
+    # Estimate volatility from stage diversity using entropy
+    stage_counts = {}
+    for e in events or []:
+        stg = e.get("kill_chain") or e.get("event_type") or "Unknown"
+        stage_counts[stg] = stage_counts.get(stg, 0) + 1
+    volatility_score = entropy_scale(stage_counts, max_val=60.0)
+
+    # Weighted aggregation (raw weighted risk)
+    weighted_risk = (
+        (severity_score * 0.30)
+        + (compromised_score * 0.25)
+        + (persistence_score_norm * 0.15)
+        + (exfiltration_score * 0.15)
+        + (anomaly_score * 0.10)
+        + (volatility_score * 0.05)
     )
 
-    if raw_score <= 0:
-        val = 0.0
-    else:
-        val = 100.0 / (1.0 + math.exp(-raw_score / 40.0))
+    # Nonlinear sigmoid compression centered to slow growth after ~55
+    try:
+        compressed_risk = 100.0 / (1.0 + math.exp(-(weighted_risk - 65.0) / 12.0))
+    except OverflowError:
+        compressed_risk = 100.0
 
-    min_r, max_r = STAGE_RANGES.get(current_stage, (20, 100))
-    bounded_val = min_r + (val / 100.0) * (max_r - min_r)
-    return round(bounded_val, 1)
+    # Damping above 85 to prevent rapid saturation
+    if compressed_risk > 85.0:
+        compressed_risk = 85.0 + ((compressed_risk - 85.0) * 0.35)
+
+    # Catastrophic boost only when explicit conditions met
+    catastrophic_conditions = {
+        "wide_compromise": compromised_weight >= 14,
+        "high_exfiltration": exfiltration_ratio >= 0.95,
+        "active_persistence": persistence_ratio >= 0.9,
+        "failed_containment": failed_defense_ratio >= 0.9,
+        "low_stability": anomaly_ratio >= 0.9,
+    }
+    boosted = boost_to_catastrophic(compressed_risk, catastrophic_conditions)
+
+    # Respect per-stage soft caps
+    min_r, max_r = STAGE_RANGES.get(current_stage, (15, 95))
+    # Map boosted risk into the stage range while preserving relative compression
+    bounded_val = min_r + ((max(min(boosted, 95.0), 15.0) - 15.0) / 80.0) * (max_r - min_r)
+    final = round(max(min_r, min(max_r, bounded_val)), 1)
+    return final
 
 
 def get_next_attack_stage(
@@ -199,35 +246,41 @@ def get_next_attack_stage(
     persistence_score,
 ):
     """
-    Enforce sequential, step-by-step campaign stage progression.
-    Reconnaissance -> Discovery -> Initial Access -> Lateral Movement -> Privilege Escalation -> Persistence -> Exfiltration.
+    Enforce sequential, stage-based campaign progression.
+    Reconnaissance -> Discovery -> Initial Access -> Execution -> Credential Access -> Privilege Escalation -> Persistence -> Collection -> Exfiltration.
     """
     if not current_stage or current_stage == "Idle":
         return "Reconnaissance"
 
-    # Normalize name to full form
     if current_stage == "Recon":
         current_stage = "Reconnaissance"
 
     if current_stage == "Reconnaissance":
-        if step > 0 or "T1046" in logged_techniques or "T1595" in logged_techniques:
+        if step > 1 or "T1046" in logged_techniques or "T1595" in logged_techniques:
             return "Discovery"
         return "Reconnaissance"
 
     if current_stage == "Discovery":
-        if compromised_count >= 1:
+        if compromised_count >= 1 or "T1190" in logged_techniques or "T1078" in logged_techniques:
             return "Initial Access"
         return "Discovery"
 
     if current_stage == "Initial Access":
-        if compromised_count >= 2:
-            return "Lateral Movement"
+        if "T1059" in logged_techniques or compromised_count >= 2:
+            return "Execution"
         return "Initial Access"
 
-    if current_stage == "Lateral Movement":
-        if db_or_srv_root or compromised_count >= 3:
+    if current_stage == "Execution":
+        if "T1003" in logged_techniques or "T1078" in logged_techniques:
+            return "Credential Access"
+        if compromised_count >= 2:
             return "Privilege Escalation"
-        return "Lateral Movement"
+        return "Execution"
+
+    if current_stage == "Credential Access":
+        if "T1055" in logged_techniques or persistence_score >= 6:
+            return "Privilege Escalation"
+        return "Credential Access"
 
     if current_stage == "Privilege Escalation":
         if persistence_score >= 4 or compromised_count >= 4:
@@ -236,7 +289,18 @@ def get_next_attack_stage(
 
     if current_stage == "Persistence":
         if dc_compromised and step >= 15:
-            return "Exfiltration"
+            return "Collection"
         return "Persistence"
+
+    if current_stage == "Collection":
+        if compromised_count >= 4 or "T1105" in logged_techniques:
+            return "Exfiltration"
+        return "Collection"
+
+    if current_stage == "Exfiltration":
+        return "Exfiltration"
+
+    if current_stage == "Mitigation":
+        return "Mitigation"
 
     return current_stage

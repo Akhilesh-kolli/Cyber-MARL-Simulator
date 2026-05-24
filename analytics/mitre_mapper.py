@@ -18,14 +18,10 @@ def calculate_mitre_frequencies(events: list) -> dict:
     """
     Calculates technique counts from a list of structured events.
     """
-    counts = {
-        "T1190": 0,
-        "T1021": 0,
-        "T1046": 0,
-        "T1595": 0
-    }
+    counts = {}
     for e in events:
-        tech = e.get("technique")
-        if tech in counts:
-            counts[tech] += 1
+        tech = e.get("technique") or e.get("mitre_name") or "DEFENSIVE-OPS"
+        # Normalize to string key
+        tech_key = str(tech).upper()
+        counts[tech_key] = counts.get(tech_key, 0) + 1
     return counts

@@ -28,7 +28,7 @@ def render_threat_trend_chart(
     )
     
     if df.empty:
-        st.info("No trend telemetry captured yet.")
+        st.markdown('<div class="empty-placeholder">No trend telemetry captured yet.</div>', unsafe_allow_html=True)
         return None
 
     # Melt the dataframe for multi-line Plotly express
@@ -71,7 +71,12 @@ def render_threat_trend_chart(
         height=350
     )
     
-    st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"responsive": True},
+        key="threat_trend_chart"
+    )
     return fig
 
 def render_mitre_pie(technique_counts: dict):
@@ -80,7 +85,7 @@ def render_mitre_pie(technique_counts: dict):
     """
     active = {k: v for k, v in technique_counts.items() if v > 0}
     if not active:
-        st.info("No adversary techniques observed during current simulation steps.")
+        st.markdown('<div class="empty-placeholder">No adversary techniques observed during current simulation steps.</div>', unsafe_allow_html=True)
         return None
 
     df = pd.DataFrame({
@@ -114,7 +119,12 @@ def render_mitre_pie(technique_counts: dict):
         height=350
     )
     
-    st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"responsive": True},
+        key="mitre_pie_chart"
+    )
     return fig
 
 def render_escalation_chart(timeline_df: pd.DataFrame):
@@ -122,7 +132,7 @@ def render_escalation_chart(timeline_df: pd.DataFrame):
     Renders the sequential threat escalation curve.
     """
     if timeline_df.empty:
-        st.info("Awaiting campaign progression to map escalation trends.")
+        st.markdown('<div class="empty-placeholder">Awaiting campaign progression to map escalation trends.</div>', unsafe_allow_html=True)
         return None
 
     fig = px.line(
@@ -154,5 +164,10 @@ def render_escalation_chart(timeline_df: pd.DataFrame):
         height=350
     )
     
-    st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"responsive": True},
+        key="escalation_chart"
+    )
     return fig

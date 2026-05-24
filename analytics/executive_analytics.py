@@ -6,6 +6,8 @@ operational discipline matrices, and executive-level briefings.
 """
 
 from analytics.mitre_mapper import get_dominant_technique
+import math
+import time
 
 def generate_executive_report(state: dict) -> dict:
     """
@@ -32,29 +34,54 @@ def generate_executive_report(state: dict) -> dict:
     incident_priority = metrics.get("incident_priority", "LOW")
     attacker_profile = metrics.get("attacker_profile", "Unknown")
     campaign_type = metrics.get("campaign_type", "Unknown Campaign")
+
+    def clamp_score(value):
+        try:
+            return max(0.0, min(100.0, float(value or 0)))
+        except (TypeError, ValueError):
+            return 0.0
+
+    threat_momentum_score = clamp_score(threat_momentum_score)
+    threat_volatility_score = clamp_score(threat_volatility_score)
+    containment_pressure_score = clamp_score(containment_pressure_score)
+    anomaly_pressure_score = clamp_score(anomaly_pressure_score)
+    threat_correlation_score = clamp_score(threat_correlation_score)
+    average_alert_confidence = clamp_score(average_alert_confidence)
     
     # 1. Step History/Step calculations
     step = state["simulation"]["step"]
     
-    # 2. Campaign Diversity Score
-    campaign_diversity_score = min(
-        100,
-        (len(metrics.get("ioc_techniques", [])) * 6)
-        + (len(metrics.get("observed_attack_stages", [])) * 10)
-        + (lateral_movement_count * 3)
-    )
+    # 2. Campaign Diversity Score (normalized, non-saturating)
+    events_count = max(1, len(state.get("events", [])))
+    tech_count = len(metrics.get("ioc_techniques", []))
+    stages_count = len(metrics.get("observed_attack_stages", []))
+
+    # dynamic caps based on observed data
+    cap_events = max(10, events_count)
+    cap_tech = max(5, tech_count * 3, 10)
+    cap_stages = max(3, stages_count * 2, 6)
+
+    def norm_log(value, cap):
+        try:
+            return max(0.0, min(100.0, (math.log1p(value) / math.log1p(cap)) * 100.0))
+        except Exception:
+            return 0.0
+
+    tech_score = norm_log(tech_count, cap_tech)
+    stage_score = norm_log(stages_count, cap_stages)
+    campaign_diversity_score = clamp_score((tech_score * 0.6) + (stage_score * 0.4))
     
-    # 3. Sophistication Score
-    threat_sophistication_score = min(
-        100,
-        int(
-            (threat_momentum_score * 0.35)
-            + (persistence_score * 1.8)
-            + (lateral_movement_count * 4)
-            + (len(metrics.get("ioc_techniques", [])) * 3)
-            + (campaign_diversity_score * 0.25)
-        )
-    )
+    # 3. Sophistication Score (weighted normalized inputs)
+    momentum_score_norm = norm_log(threat_momentum_score, 100)
+    persistence_norm = norm_log(persistence_score, max(10, persistence_score + 1))
+    lateral_norm = norm_log(lateral_movement_count, cap_events)
+    tech_norm = tech_score
+    threat_sophistication_score = clamp_score(int(
+        (momentum_score_norm * 0.30)
+        + (persistence_norm * 0.30)
+        + (lateral_norm * 0.20)
+        + (tech_norm * 0.20)
+    ))
     
     # 4. Analyst Verdict
     if threat_sophistication_score >= 85:
@@ -91,7 +118,7 @@ def generate_executive_report(state: dict) -> dict:
         100.0,
         (threat_sophistication_score * 0.45)
         + (persistence_score * 1.6)
-        + (threat_momentum_score * 0.25)
+        + (threat_momentum_score * 0.18)
         + (campaign_diversity_score * 0.18)
     )
     
@@ -123,14 +150,11 @@ def generate_executive_report(state: dict) -> dict:
         f"Observed intent suggests {attacker_intent.lower()}"
     )
     
-    # 11. Business Impact
-    business_impact_score = min(
-        100.0,
-        (compromised_count * 10)
-        + (critical_alerts * 4)
-        + (persistence_score * 1.5)
-        + (threat_momentum_score * 0.4)
-    )
+    # 11. Business Impact (normalized, weighted, diminishing returns)
+    comp_norm = norm_log(compromised_count, max(5, compromised_count * 3, cap_events))
+    crit_norm = norm_log(critical_alerts, cap_events)
+    persistence_norm = norm_log(persistence_score, max(10, persistence_score + 1))
+    business_impact_score = clamp_score((comp_norm * 0.6) + (crit_norm * 0.3) + (persistence_norm * 0.1))
     
     # 12. Executive Impact
     if business_impact_score >= 85:
@@ -160,7 +184,29 @@ def generate_executive_report(state: dict) -> dict:
         + (containment_pressure_score * 0.2)
     )
     
-    # 15. Executive Decision Narrative
+    # 15. Executive Response Strategy
+    if incident_priority == "P1" or business_impact_score >= 85:
+        executive_actions = [
+            "Activate incident response team",
+            "Initiate enterprise escalation",
+            "Notify leadership",
+            "Invoke business continuity",
+            "Assess operational impact"
+        ]
+    elif incident_priority == "P2" or business_impact_score >= 65:
+        executive_actions = [
+            "Prepare leadership briefing",
+            "Escalate to senior SOC operations",
+            "Validate critical asset exposure",
+            "Coordinate cross-functional response"
+        ]
+    else:
+        executive_actions = [
+            "Maintain elevated monitoring posture",
+            "Review containment effectiveness",
+            "Align SOC actions with business risk tolerance"
+        ]
+
     executive_decision_narrative = (
         f"Operational analysis indicates {executive_impact.lower()} "
         f"Containment urgency currently assessed at {containment_urgency:.1f}/100. "
@@ -297,6 +343,8 @@ def generate_executive_report(state: dict) -> dict:
         "incident_chronology": incident_chronology,
         "research_summary": research_summary_narrative,
         "simulation_reliability": simulation_reliability,
+        "executive_actions": executive_actions,
+        "executive_response_strategy": "; ".join(executive_actions),
         
         # Auxiliary scores for rendering
         "soc_stability_index": soc_stability_index,

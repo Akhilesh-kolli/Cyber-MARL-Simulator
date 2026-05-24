@@ -24,29 +24,70 @@ THREAT_NUMERIC = {
 def build_timeline_df(events: list) -> pd.DataFrame:
     """
     Build timeline DataFrame from structured event list.
-    Returns columns: Time, Stage, Threat, Event, ThreatScore, Actor
+    Returns columns: Event ID, Time, Stage, Severity, Technique, Target Node, Source Node, CVE, Actor, Confidence, Status, Event Summary, ThreatScore
     """
-    from event_engine import format_event_log
     rows = []
     cumulative = 0.0
     for idx, e in enumerate(events):
-        label = format_event_log(e)
         base_score = THREAT_NUMERIC.get(e.get("threat", e.get("severity", "LOW")), 0)
         cumulative += base_score * (1 + idx * 0.04)
         escalation_score = round(cumulative, 2)
-        
+        stage = e.get("kill_chain", e.get("event_type", "Unknown"))
+        technique = e.get("technique") or e.get("mitre_name") or "N/A"
+        target_node = e.get("node") or e.get("node_type") or "Unknown"
+        source_node = e.get("source") or "Attacker"
+        confidence = e.get("detection_confidence") if e.get("detection_confidence") is not None else e.get("confidence", 0)
+        status = e.get("status", "unknown")
+        summary = e.get("event_summary") or e.get("message", "")
+        if not summary:
+            if e.get("actor") == "defender":
+                summary = f"Defender action executed against {target_node}."
+            elif stage == "Reconnaissance":
+                summary = f"Port scan detected against {target_node}"
+            elif stage == "Discovery":
+                summary = f"Network discovery activity observed on {target_node}"
+            elif stage == "Initial Access":
+                summary = f"{technique} attempt against {target_node}"
+            elif stage == "Execution":
+                summary = f"Suspicious service execution on {target_node}"
+            elif stage == "Persistence":
+                summary = f"Persistence behavior detected on {target_node}"
+            elif stage == "Privilege Escalation":
+                summary = f"Privilege escalation attempt detected on {target_node}"
+            elif stage == "Lateral Movement":
+                summary = f"Lateral movement from {source_node} to {target_node}"
+            elif stage == "Collection":
+                summary = f"Data collection activity observed on {target_node}"
+            elif stage == "Exfiltration":
+                summary = f"Suspicious outbound transfer from {target_node}"
+            elif stage == "Command and Control":
+                summary = f"Command and control channel established by {source_node}"
+            elif stage == "Mitigation":
+                summary = f"Defender isolated compromised {target_node}"
+            else:
+                summary = e.get("message", "No summary available.")
+
         rows.append({
+            "Event ID":    idx + 1,
             "Time":        e.get("timestamp", ""),
-            "Stage":       e.get("kill_chain", e.get("event_type", "Unknown")),
-            "Threat":      e.get("threat", e.get("severity", "LOW")),
-            "Event":       label,
-            "ThreatScore": escalation_score,
+            "Stage":       stage,
+            "Severity":    e.get("threat", e.get("severity", "LOW")),
+            "Technique":   technique,
+            "Target Node": target_node,
+            "Source Node": source_node,
+            "CVE":         e.get("cve", "N/A"),
             "Actor":       str(e.get("actor", "unknown")).capitalize(),
+            "Confidence":  confidence,
+            "Status":      status,
+            "Event Summary": summary,
+            "ThreatScore": escalation_score,
         })
 
-    return pd.DataFrame(rows) if rows else pd.DataFrame(
-        columns=["Time", "Stage", "Threat", "Event", "ThreatScore", "Actor"]
-    )
+    columns = [
+        "Event ID", "Time", "Stage", "Severity", "Technique", "Target Node",
+        "Source Node", "CVE", "Actor", "Confidence", "Status", "Event Summary", "ThreatScore"
+    ]
+    return pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
 
 
 # --------------------------------------------------

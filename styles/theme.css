@@ -85,9 +85,31 @@ div.element-container {
 
     border-radius: 14px;
 
-    padding: 1rem;
+    padding: 0.85rem;
 
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
+
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+}
+
+div[data-testid="stMetric"] {
+    min-height: 4.5rem !important;
+}
+
+/* Allow Streamlit to control dataframe scrolling natively; avoid forcing inner scrollbars */
+div.stDataFrame, div.stDataFrame div {
+    overflow: visible !important;
+}
+
+div.stDataFrame table td {
+    white-space: normal !important;
+}
+
+/* Ensure only one scroll container for dataframes */
+div.stDataFrame > div:first-child {
+    overflow: visible !important;
 }
 
 /* -------------------------------
@@ -142,6 +164,89 @@ thead tr th {
 
 tbody tr td {
     color: #d1d5db !important;
+}
+
+/* =========================
+   SOC TABLE CARD
+   ========================= */
+.soc-table-card {
+    padding: 12px !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    background: rgba(8,15,35,0.92) !important;
+    border: 1px solid rgba(80,120,255,0.15) !important;
+}
+
+/* Remove unwanted separators */
+.soc-table-card::before,
+.soc-table-card::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Streamlit dataframe scrolling */
+[data-testid="stDataFrame"] {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    border-radius: 12px !important;
+}
+
+/* Inner dataframe sizing */
+[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+/* Glide table */
+.glideDataEditor {
+    overflow: auto !important;
+    border-radius: 12px !important;
+}
+
+/* Remove extra spacing above/below dataframe */
+.element-container:has([data-testid="stDataFrame"]) {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Reset inner DataFrame visuals when placed inside a soc-table-card
+   so the card provides the only border/background and we avoid
+   double separators. */
+.soc-table-card .stDataFrame,
+.soc-table-card div[data-testid="stDataFrame"],
+.soc-table-card .element-container {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.soc-table-card div[data-testid="stDataFrame"] > div:first-child {
+    max-height: 520px !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    padding: 0 !important;
+}
+
+/* Stronger, cross-selector override to ensure the inner Streamlit
+   DataFrame container inside .soc-table-card actually captures
+   pointer/scroll events and doesn't bubble scrolling to the page. */
+.soc-table-card .stDataFrame > div:first-child,
+.soc-table-card div[data-testid="stDataFrame"] > div:first-child {
+    max-height: 520px !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    pointer-events: auto !important;
+    display: block !important;
+    position: relative !important;
 }
 
 /* -------------------------------
@@ -234,6 +339,66 @@ header[data-testid="stHeader"] {
     color: #f3f4f6 !important;
 
     opacity: 1 !important;
+}
+
+/* Layout fixes for collapsed sidebar and responsive page width */
+[data-testid="stAppViewContainer"] {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+div[data-testid="stAppViewContainer"] > div,
+[data-testid="stAppViewContainer"] > div > div {
+    width: 100% !important;
+    margin-left: 0 !important;
+    min-width: 0 !important;
+}
+
+main, .main, .block-container {
+    width: 100% !important;
+    margin-left: 0 !important;
+    min-width: 0 !important;
+}
+
+section[data-testid="stSidebar"] {
+    min-width: 0 !important;
+    max-width: 320px !important;
+}
+
+.event-console, .event-item {
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+
+div.stDataFrame table td, div.stDataFrame table th {
+    word-break: break-word !important;
+}
+
+/* Prevent nested/duplicate scrollbars: prefer Streamlit native scrolling for cards */
+.graph-card, .card, .data-card {
+    overflow: visible !important;
+}
+
+/* Plotly charts should be clipped to their container to avoid visual overflow */
+div[data-testid="stPlotlyChart"] {
+    overflow: hidden !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Live feed scroll container: fixed height with internal scroll */
+.live-feed-container {
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Ensure table DataFrame inner wrapper participates in horizontal scrolling when inside soc-table-wrapper */
+.soc-table-wrapper .stDataFrame > div:first-child {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
 }
 
 /* =========================================================
@@ -502,6 +667,8 @@ div[data-testid="stPlotlyChart"]::before {
 
 .block-container {
 
+    width: auto !important;
+
     max-width: 100% !important;
 
     padding-top: 1.2rem;
@@ -511,6 +678,17 @@ div[data-testid="stPlotlyChart"]::before {
     padding-left: 2rem;
 
     padding-right: 2rem;
+}
+
+section.main,
+section.main > div,
+[data-testid="stAppViewContainer"] {
+
+    width: auto !important;
+
+    max-width: 100% !important;
+
+    min-width: 0 !important;
 }
 
 /* -------------------------------
@@ -563,9 +741,13 @@ div[data-testid="stMetric"] {
 
 [data-testid="stSidebar"] {
 
-    min-width: 300px;
+    min-width: 0 !important;
 
-    max-width: 320px;
+    max-width: 100% !important;
+
+    width: auto !important;
+
+    flex: 0 0 auto !important;
 }
 
 /* -------------------------------
@@ -580,6 +762,32 @@ div[data-testid="stMetric"] {
 
         padding-right: 3rem;
     }
+}
+
+/* -------------------------------
+   EMPTY PLACEHOLDER (REPLACES st.info)
+-------------------------------- */
+.empty-placeholder{
+    color: #cbd5e1;
+    background: rgba(2,6,23,0.45);
+    border: 1px solid rgba(255,255,255,0.03);
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+/* Hide Streamlit info/alert SVG icons to remove stray circular badges */
+.stAlert svg, .stInfo svg, [data-testid="stAlert"] svg {
+    display: none !important;
+}
+
+/* Hide heading anchor/link affordances that appear as stray icons beside titles. */
+[data-testid="stHeaderActionElements"],
+.stMarkdown h1 a,
+.stMarkdown h2 a,
+.stMarkdown h3 a {
+    display: none !important;
 }
 
 /* -------------------------------
@@ -1481,8 +1689,23 @@ body {
     border:1px solid rgba(255,255,255,0.06);
     margin-top:10px;
     margin-bottom:20px;
-    max-height:300px;
-    overflow-y:auto;
+    max-height:500px !important;
+    overflow:hidden !important;
+}
+
+/* Scrollable inner feed container: show ~3-6 entries and allow vertical scroll */
+.live-feed-container{
+    max-height:460px !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    padding-right:6px;
+}
+
+/* Table wrapper: single horizontal scroll layer for dataframes */
+.table-wrapper{
+    overflow-x:auto;
+    overflow-y:hidden;
+    width:100%;
 }
 
 .event-item{
@@ -1609,22 +1832,40 @@ body {
    COMPACT METRIC & CARD OVERFLOW HANDLING
    ========================================================= */
 [data-testid="stMetricValue"] {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
+    word-break: break-word !important;
     font-size: clamp(14px, 1.4vw, 20px) !important;
     line-height: 1.2 !important;
 }
 
+[data-testid="stMetricValue"] *,
+[data-testid="stMetricValue"] div,
+[data-testid="stMetricValue"] span {
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: break-word !important;
+}
+
 [data-testid="stMetricLabel"] {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
+    word-break: break-word !important;
     font-size: clamp(10px, 1.0vw, 11px) !important;
     line-height: 1.1 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
     color: #94a3b8 !important;
+}
+
+[data-testid="stMetricLabel"] *,
+[data-testid="stMetricLabel"] div,
+[data-testid="stMetricLabel"] span {
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: break-word !important;
 }
 
 [data-testid="stMetric"] {
@@ -1642,15 +1883,230 @@ body {
 }
 
 .kpi-card-value {
-    font-size: clamp(16px, 1.8vw, 24px) !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+    font-size: clamp(14px, 1.6vw, 22px) !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
 }
 
 .kpi-card-title {
     font-size: 11px !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
+}
+
+/* Responsive final override to ensure full-width layout after sidebar collapse */
+[data-testid="stAppViewContainer"],
+.block-container,
+section.main,
+section.main > div,
+div[data-testid="stPlotlyChart"],
+div.stDataFrame {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+}
+
+div[data-testid="stPlotlyChart"] {
+    display: block !important;
+}
+
+/* Collapse-safe sidebar and main content reflow */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"][aria-expanded="false"],
+[data-testid="stSidebar"][data-expanded="false"] {
+    width: auto !important;
+    min-width: 0 !important;
+    position: relative !important;
+}
+
+section.main,
+.block-container,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+section.main > div,
+.block-container > div,
+[data-testid="stAppViewContainer"] > div {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* Hide Streamlit divider separators that can appear as unwanted lines */
+hr,
+div.stDivider,
+div[role="separator"],
+div[data-testid="stDivider"],
+hr.stDivider {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* =========================================================
+   HIDE ORPHAN/EMPTY DIVIDERS
+   Catch common Streamlit/markup separators and hide them
+   ========================================================= */
+hr, hr.stDivider, div.stDivider, div[role="separator"], div[data-testid="stDivider"] {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* =========================================================
+   SIDEBAR COLLAPSE/EXPANSION - force main content to expand
+   ========================================================= */
+[data-testid="stSidebar"] {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+}
+
+.block-container, section.main, [data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* If the sidebar is collapsed, ensure charts/dataframes reflow */
+section.main div[data-testid="stPlotlyChart"], section.main div.stDataFrame {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* Legacy wrapper rules removed — using .soc-table-card and Streamlit-native scrolling */
+
+/* =========================================================
+   ATTACK TIMELINE + IOC TABLE FIX
+   ========================================================= */
+
+/* Single clean container */
+.attack-table-card,
+.soc-table-card {
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-}
+    padding: 10px !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    border-radius: 18px !important;
+}
+
+/* Remove outer fake separators */
+.attack-table-card::before,
+.attack-table-card::after,
+.soc-table-card::before,
+.soc-table-card::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Remove Streamlit nested backgrounds */
+.attack-table-card .stDataFrame,
+.soc-table-card .stDataFrame,
+.attack-table-card .element-container,
+.soc-table-card .element-container {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Proper dataframe scroll handling */
+.attack-table-card [data-testid="stDataFrame"],
+.soc-table-card [data-testid="stDataFrame"] {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 12px !important;
+}
+
+/* Actual scrolling viewport */
+.attack-table-card [data-testid="stDataFrame"] > div:first-child,
+.soc-table-card [data-testid="stDataFrame"] > div:first-child {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    max-height: 520px !important;
+    width: 100% !important;
+}
+
+/* Glide table engine */
+.attack-table-card .glideDataEditor,
+.soc-table-card .glideDataEditor {
+    overflow: auto !important;
+    width: 100% !important;
+}
+
+/* Prevent clipped right-side columns */
+.attack-table-card canvas,
+.soc-table-card canvas {
+    max-width: none !important;
+}
+
+/* Remove empty separators above/below tables */
+.element-container:has(.soc-table-card),
+.element-container:has(.attack-table-card) {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Remove hidden line artifacts */
+hr,
+div.stDivider,
+div[role="separator"],
+div[data-testid="stDivider"] {
+    display: none !important;
+}
+
+/* =========================================================
+   TOPBAR RIGHT COLUMN FIX
+   ========================================================= */
+
+[data-testid="stHorizontalBlock"]:has(.status-banner) {
+    align-items: center !important;
+    overflow: visible !important;
+}
+
+[data-testid="stHorizontalBlock"]:has(.status-banner) > div[data-testid="stColumn"] {
+    overflow: visible !important;
+}
+
+[data-testid="stHorizontalBlock"]:has(.status-banner) > div[data-testid="stColumn"]:last-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    overflow: visible !important;
+}
+
+[data-testid="stHorizontalBlock"]:has(.status-banner) > div[data-testid="stColumn"]:last-child .element-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+}
+
+[data-testid="stHorizontalBlock"]:has(.status-banner) > div[data-testid="stColumn"]:last-child .stMarkdown {
+    width: 100% !important;
+    overflow: visible !important;
+}
+
+/* SOC Trend chart full width */
+div[data-testid="stPlotlyChart"]:has(.js-plotly-plot) {
+    width: 100% !important;
+    min-width: 100% !important;
+}

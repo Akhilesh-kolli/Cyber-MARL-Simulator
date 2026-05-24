@@ -32,6 +32,7 @@ from backend.mitigation_engine import (
 )
 from backend.telemetry_engine import update_telemetry_metrics
 from backend.graph_engine import generate_network_graph
+from analytics.bounded_metrics import sigmoid_scale, clamp_0_95
 
 def execute_simulation_step(
     step: int,
@@ -127,6 +128,26 @@ def execute_simulation_step(
                 attack_result = probe_tcp_service(port)
 
         technique_id = vuln_info.get("mitre", "UNKNOWN")
+        stage_techniques = {
+            "Execution": "T1059",
+            "Credential Access": "T1003",
+            "Defense Evasion": "T1562",
+            "Collection": "T1105",
+            "Command and Control": "T1105",
+            "Privilege Escalation": "T1055",
+            "Persistence": "T1547",
+            "Exfiltration": "T1486",
+        }
+        if attack_stage in stage_techniques and np.random.random() > 0.15:
+            technique_id = stage_techniques[attack_stage]
+        elif attack_stage == "Discovery" and "T1046" not in metrics["ioc_techniques"]:
+            technique_id = "T1046"
+        elif attack_stage == "Reconnaissance" and "T1595" not in metrics["ioc_techniques"]:
+            technique_id = "T1595"
+
+        if technique_id == "UNKNOWN":
+            technique_id = vuln_info.get("mitre", "T1595")
+
         cvss_score = vuln_info.get("cvss", 5.0)
         attack_momentum = min(0.20, metrics["lateral_movement_count"] * 0.015)
         exploit_probability = min(0.90, (cvss_score / 12) + (asset_weight * 0.04) + attack_momentum)
@@ -254,9 +275,10 @@ def execute_simulation_step(
                 reward += max(0, 12 - compromised_count)
                 reward -= metrics["persistence_score"] * 0.15
 
-                metrics["containment_pressure_score"] += (len(compromised_nodes) * 2.5) + (metrics["critical_alerts"] * 0.6) + (metrics["persistence_score"] * 0.2)
-                metrics["containment_pressure_score"] = max(0.0, metrics["containment_pressure_score"] - metrics["successful_defenses"] * 0.15)
-                
+                containment_increment = (len(compromised_nodes) * 1.2) + (metrics["critical_alerts"] * 0.2) + (metrics["persistence_score"] * 0.1)
+                defense_relief = (metrics["successful_defenses"] * 1.5) + (metrics["defense_actions_count"] * 0.3)
+                metrics["containment_pressure_score"] = max(0.0, min(85.0, metrics["containment_pressure_score"] + containment_increment - defense_relief))
+                                
                 # Neighbor cleanup
                 execute_adjacent_cleanup(highest_risk_node, obs, env.graph, env.node_count, nodes_state)
                 
@@ -327,40 +349,106 @@ def execute_simulation_step(
         threat_level = "CRITICAL"
     metrics["threat_level"] = threat_level
 
-    # Anomaly pressure
-    metrics["anomaly_pressure_score"] += (len(metrics["ioc_ports"]) * 1.5) + (len(metrics["ioc_techniques"]) * 2.5) + (metrics["critical_alerts"] * 0.8) + (metrics["high_severity_events"] * 0.5)
-    if threat_level == "CRITICAL":
-        metrics["anomaly_pressure_score"] += 4
-    elif threat_level == "HIGH":
-        metrics["anomaly_pressure_score"] += 2
-    metrics["anomaly_pressure_score"] = max(0.0, metrics["anomaly_pressure_score"] - metrics["successful_defenses"] * 0.12)
-
-    # Threat Volatility & correlation
-    metrics["threat_volatility_score"] = max(0.0, metrics["threat_volatility_score"] + (metrics["threat_momentum_score"] * 0.08) + (metrics["critical_alerts"] * 0.6) + (metrics["high_severity_events"] * 0.4) + (metrics["lateral_movement_count"] * 0.7) - (metrics["successful_defenses"] * 0.18))
+    # ─── Anomaly Pressure, Volatility (delegated to anomaly_engine) ───
+    # These are computed in update_anomaly_and_volatility() below
     
-    correlation_delta = len(metrics["ioc_techniques"]) * 1.8 + len(metrics["ioc_ports"]) * 1.2 + metrics["lateral_movement_count"] * 1.5 + metrics["persistence_score"] * 0.4
-    if "Recon" in metrics["observed_attack_stages"] and "Discovery" in metrics["observed_attack_stages"]:
-        correlation_delta += 4
-    if "Initial Access" in metrics["observed_attack_stages"] and "Lateral Movement" in metrics["observed_attack_stages"]:
-        correlation_delta += 6
-    if "Persistence" in metrics["observed_attack_stages"]:
-        correlation_delta += 8
-    if threat_level == "CRITICAL":
-        correlation_delta += 8
-    elif threat_level == "HIGH":
-        correlation_delta += 4
-    metrics["threat_correlation_score"] = max(0.0, metrics["threat_correlation_score"] + correlation_delta - metrics["successful_defenses"] * 0.85)
+    # ─── Threat Correlation: behavior similarity using user-specified weighting ───
+    # Implements correlation = 0.40*technique_reuse + 0.25*node_reuse + 0.20*IOC_overlap + 0.15*stage_pattern_similarity
+    from analytics.bounded_metrics import clamp_0_95
 
-    # Threat Momentum
-    if threat_level == "CRITICAL":
-        metrics["threat_momentum_score"] += max(1.0, 4.0 - (metrics["successful_defenses"] * 0.15))
-    elif threat_level == "HIGH":
-        metrics["threat_momentum_score"] += max(1.0, 2.0 - (metrics["successful_defenses"] * 0.08))
+    events_list = metrics.get("structured_events") or state.get("events", []) or []
+    event_count = max(1, len(events_list))
+
+    # Technique reuse: proportion of repeated technique occurrences
+    tech_counts = {}
+    for e in events_list:
+        t = e.get("technique")
+        if t:
+            tech_counts[t] = tech_counts.get(t, 0) + 1
+    total_tech_occ = sum(tech_counts.values()) if tech_counts else 0
+    technique_reuse = 0.0
+    if total_tech_occ > 0:
+        repeats = sum((c - 1) for c in tech_counts.values() if c > 1)
+        technique_reuse = (repeats / total_tech_occ) * 100.0
+
+    # Node reuse: repeated targeting of the same nodes
+    node_list = [e.get("node") for e in events_list if e.get("node")]
+    node_reuse = 0.0
+    if len(node_list) > 0:
+        unique_nodes = len(set(node_list))
+        node_reuse = ((len(node_list) - unique_nodes) / len(node_list)) * 100.0
+
+    # IOC overlap: count of observed IOCs (ports + technique IOCs) relative to event volume
+    ioc_ports = metrics.get("ioc_ports", [])
+    ioc_techs = metrics.get("ioc_techniques", [])
+    ioc_count = len(ioc_ports) + len(ioc_techs)
+    ioc_overlap = min(100.0, (ioc_count / event_count) * 100.0)
+
+    # Stage pattern similarity: repeated appearance of the same stages
+    stage_counts = {}
+    for e in events_list:
+        s = e.get("kill_chain") or e.get("event_type") or "Unknown"
+        stage_counts[s] = stage_counts.get(s, 0) + 1
+    stage_repeats = sum((c - 1) for c in stage_counts.values() if c > 1)
+    stage_pattern_similarity = (stage_repeats / event_count) * 100.0
+
+    # Weighted composite per requested weights
+    correlation_raw = (
+        (technique_reuse * 0.40)
+        + (node_reuse * 0.25)
+        + (ioc_overlap * 0.20)
+        + (stage_pattern_similarity * 0.15)
+    )
+
+    # Modest defense penalty to reduce correlation when defenses are effective
+    defense_penalty = min(20.0, metrics.get("successful_defenses", 0) * 0.7)
+    final_corr = max(0.0, correlation_raw - defense_penalty)
+    metrics["threat_correlation_score"] = round(clamp_0_95(final_corr), 2)
+    
+    # ─── Threat Momentum: escalation velocity with containment friction ───
+    # Represents attacker operational tempo relative to defense effectiveness
+    
+    momentum_base = 0.0
+    
+    # Stage-specific momentum
     if attack_stage == "Persistence":
-        metrics["threat_momentum_score"] += max(2.0, 5.0 - (metrics["defense_actions_count"] * 0.12))
+        momentum_base = max(1.5, 5.0 - (metrics.get("defense_actions_count", 0) * 0.08))
     elif attack_stage == "Lateral Movement":
-        metrics["threat_momentum_score"] += max(1.0, 3.0 - (metrics["successful_defenses"] * 0.10))
-    metrics["threat_momentum_score"] = max(0.0, metrics["threat_momentum_score"] - metrics["successful_defenses"] * 0.35 - metrics["defense_actions_count"] * 0.05)
+        momentum_base = max(1.2, 4.0 - (metrics.get("successful_defenses", 0) * 0.08))
+    elif attack_stage == "Execution":
+        momentum_base = max(1.0, 3.0 - (metrics.get("successful_defenses", 0) * 0.07))
+    elif attack_stage == "Exfiltration":
+        momentum_base = max(2.0, 5.0 - (metrics.get("successful_defenses", 0) * 0.06))
+    else:
+        momentum_base = max(0.8, 2.0 - (metrics.get("successful_defenses", 0) * 0.05))
+    
+    # Threat level impact
+    if threat_level == "CRITICAL":
+        momentum_base += 1.5
+    elif threat_level == "HIGH":
+        momentum_base += 0.8
+    
+    # Defense friction (reduces momentum)
+    defense_friction = (
+        (metrics.get("successful_defenses", 0) * 0.35) +
+        (metrics.get("defense_actions_count", 0) * 0.08)
+    )
+    
+    raw_momentum = max(0.0, momentum_base - defense_friction)
+    
+    # Normalize momentum: scale relative to event count
+    normalized_momentum = (raw_momentum / max(1.0, momentum_base + 2.5)) * 100.0
+    defense_eff = metrics.get("defense_effectiveness", 0.0)
+    momentum_dampened = normalized_momentum * (1.0 - (defense_eff / 200.0))
+    metrics["threat_momentum_score"] = round(clamp_0_95(momentum_dampened), 2)
+
+    # Update anomaly pressure and volatility using the anomaly engine (bounded math)
+    try:
+        from analytics.anomaly_engine import update_anomaly_and_volatility
+        update_anomaly_and_volatility(state, threat_level)
+    except Exception:
+        # Keep simulation robust if anomaly engine fails
+        pass
 
     # 4. Explainable reward evaluation
     reward_delta, reward_reason = calculate_step_reward(
@@ -404,6 +492,10 @@ def execute_simulation_step(
     alert_confidence += (len(metrics["ioc_techniques"]) * 1.5) + (len(metrics["ioc_ports"]) * 1.0) + (metrics["critical_alerts"] * 0.6) + (metrics["successful_defenses"] * 0.4) - (metrics["failed_defenses"] * 0.3)
     alert_confidence = max(25, min(int(alert_confidence + np.random.randint(-4, 5)), 100))
 
+    event_summary = f"{attack_stage} event on {target_system}: {action_text}"
+    if not is_attacker:
+        event_summary = f"SOC defender action targeting {target_system}: {action_text}"
+
     event = build_canonical_event(
         step=step,
         severity=event_severity,
@@ -434,7 +526,8 @@ def execute_simulation_step(
         detection_severity=detection_info.get("severity", "N/A"),
         detection_confidence=alert_confidence,
         timeline_weight=metrics["threat_momentum_score"] + metrics["persistence_score"] + metrics["threat_correlation_score"],
-        explanation=explanation
+        explanation=explanation,
+        event_summary=event_summary,
     )
     
     # Push event through centralized bus
@@ -445,11 +538,15 @@ def execute_simulation_step(
     metrics["structured_events"].append(event)
     
     timestamp = datetime.now().strftime("%H:%M:%S")
+    # Use canonical event fields (already normalized by build_canonical_event)
     metrics["timeline_data"].insert(0, {
         "Time": timestamp,
-        "Stage": attack_stage if is_attacker else "Mitigation",
-        "Threat": threat_level,
-        "Event": action_text,
+        "Stage": event.get("kill_chain", attack_stage if is_attacker else "Mitigation"),
+        "Threat": event.get("threat", threat_level),
+        "Technique": event.get("technique", "DEFENSIVE-OPS"),
+        "CVE": event.get("cve", "NOT-APPLICABLE"),
+        "Summary": event.get("event_summary", event_summary),
+        "Event": event.get("event", action_text),
     })
 
     metrics["threat_history"].append(metrics["critical_alerts"])
