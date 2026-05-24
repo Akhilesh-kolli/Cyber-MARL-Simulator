@@ -6,6 +6,7 @@ Renders the complete Executive SOC Summary workspace, dividing telemetry into fi
 
 import streamlit as st
 from analytics.mitre_mapper import get_dominant_technique
+from exports.pdf_exporter import generate_soc_pdf_report
 
 def _exec_card(title, body, border_color="#0ea5e9"):
     return (
@@ -170,3 +171,36 @@ def render_executive_panel(state: dict):
             + _exec_card("Simulation Reliability", exec_data.get("simulation_reliability", "N/A"), "#64748b"),
             unsafe_allow_html=True
         )
+
+    # -----------------------------
+    # PDF Export (Executive View only)
+    # -----------------------------
+    try:
+        # Build payload from session_state (source of truth)
+        soc_metrics = st.session_state.get("soc_metrics", {})
+        sidebar_summary = st.session_state.get("sidebar_summary", {})
+        attack_df = st.session_state.get("attack_df")
+        mitre_df = st.session_state.get("mitre_df")
+        ioc_df = st.session_state.get("ioc_df")
+        live_feed = st.session_state.get("live_feed", [])
+
+        pdf_bytes = generate_soc_pdf_report(
+            soc_metrics=soc_metrics,
+            sidebar_summary=sidebar_summary,
+            attack_timeline_df=attack_df,
+            mitre_df=mitre_df,
+            ioc_df=ioc_df,
+            live_feed=live_feed,
+        )
+
+        fname = f"soc_incident_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        st.download_button(
+            label="📄 Download SOC Incident Report (PDF)",
+            data=pdf_bytes,
+            file_name=fname,
+            mime="application/pdf",
+            key="download_soc_pdf_button",
+        )
+    except Exception:
+        # Keep executive panel robust if PDF generation fails
+        st.markdown('<div class="empty-placeholder">PDF export currently unavailable.</div>', unsafe_allow_html=True)
