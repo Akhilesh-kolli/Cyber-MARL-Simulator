@@ -4,45 +4,30 @@ from pathlib import Path
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent))
-
 from marlon.graph_env import GraphCyberEnv
 
-
 def main():
-
-    print("\n=== TRAINING DEFENDER ===\n")
-
-    # ---- create logs folder ----
     root_dir = Path(__file__).resolve().parents[1]
     log_dir = root_dir / "logs"
     log_dir.mkdir(exist_ok=True)
 
-    # ---- environment with logging enabled ----
     env = GraphCyberEnv()
     env = Monitor(env, str(log_dir / "defender_monitor.csv"))
 
     model = PPO(
-        "MlpPolicy",
-        env,
+        "MlpPolicy", env,
         verbose=1,
         learning_rate=0.0003,
         n_steps=512,
         batch_size=64,
         gamma=0.99,
     )
+    model.learn(total_timesteps=100000)
 
-    model.learn(total_timesteps=60000)
-
-    # ---- save model ----
     model_dir = root_dir / "models"
     model_dir.mkdir(exist_ok=True)
-
-    save_path = model_dir / "ppo_defender_graph"
-    model.save(str(save_path))
-
-    print("\n✅ Defender saved to:", save_path)
-    print("✅ Logs saved to:", log_dir / "defender_monitor.csv")
-
+    model.save(str(model_dir / "ppo_defender_graph"))
+    print("Defender saved to:", model_dir / "ppo_defender_graph")
 
 if __name__ == "__main__":
     main()

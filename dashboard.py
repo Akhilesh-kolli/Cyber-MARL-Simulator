@@ -47,6 +47,7 @@ from analytics.ioc_engine import IOCEngine
 
 # ── Component imports ────────────────────────────────────────────────────────
 from components.kpi_cards import render_kpi_cards
+from visualization.card_renderer import render_metrics_cards
 from components.threat_panels import render_threat_hunt_panel, render_ioc_panel
 from components.mitre_panels import render_mitre_panel
 from components.executive_panels import render_executive_panel
@@ -77,17 +78,77 @@ if "soc_metrics" not in st.session_state:
 
 # ── Cached resource loading ──────────────────────────────────────────────────
 @st.cache_resource
-def load_models():
-    attacker = PPO.load("models/ppo_attacker_graph")
-    defender = PPO.load("models/ppo_defender_graph")
-    return attacker, defender
-
-@st.cache_resource
 def load_env():
     return GraphCyberEnv()
 
-attacker_model, defender_model = load_models()
+
+@st.cache_resource
+def load_models():
+    """Attempt to load pretrained PPO models from `models/`.
+
+    If model files are missing, return lightweight dummy policy objects
+    that expose a `predict(obs, deterministic=False)` API so the app
+    can run in a degraded / demo mode without trained weights.
+    """
+    from pathlib import Path
+
+    class _DummyModel:
+        def predict(self, obs, deterministic=False):
+            # obs is typically a 1D array with length == env.node_count
+            try:
+                import numpy as _np
+
+                if hasattr(obs, "__len__"):
+                    n = len(obs)
+                    if n > 0:
+                        return int(_np.random.randint(0, n)), None
+            except Exception:
+                pass
+            return 0, None
+
+    def _find_model_path(base_name: str):
+        p = Path(base_name)
+        if p.exists():
+            return str(p)
+        z = p.with_suffix(".zip")
+        if z.exists():
+            return str(z)
+        return None
+
+    attacker_path = _find_model_path("models/ppo_attacker_graph")
+    defender_path = _find_model_path("models/ppo_defender_graph")
+
+    attacker = None
+    defender = None
+
+    # Try to load trained models if present; otherwise use dummy fallbacks
+    try:
+        if attacker_path:
+            attacker = PPO.load(attacker_path)
+        else:
+            st.warning("Attacker model not found at models/ppo_attacker_graph — using fallback random policy.")
+            attacker = _DummyModel()
+    except Exception as e:
+        st.error(f"Failed to load attacker model: {e}. Using fallback policy.")
+        attacker = _DummyModel()
+
+    try:
+        if defender_path:
+            defender = PPO.load(defender_path)
+        else:
+            st.warning("Defender model not found at models/ppo_defender_graph — using fallback random policy.")
+            defender = _DummyModel()
+    except Exception as e:
+        st.error(f"Failed to load defender model: {e}. Using fallback policy.")
+        defender = _DummyModel()
+
+    return attacker, defender
+
+
+# Load environment first so downstream code can inspect env if needed
 env = load_env()
+# Then load models (will fall back to dummy policies if files missing)
+attacker_model, defender_model = load_models()
 
 # ── DVWA login attempt (non-blocking) ────────────────────────────────────────
 try:
@@ -107,12 +168,12 @@ for i in range(env.node_count):
 # Human-friendly node labels mapping. Node 1 carries the DVWA service in this
 # six-node environment, so keep the service visible without inventing a node.
 DEFAULT_NODE_LABELS = {
-    0: "Workstation",
-    1: "Firewall / DVWA",
-    2: "Database",
+    0: "Nginx",
+    1: "DVWA",
+    2: "MySQL",
     3: "Server",
-    4: "DomainController",
-    5: "SOC",
+    4: "Domain-Controller",
+    5: "Workstation",
 }
 
 if "node_labels" not in st.session_state or not st.session_state.get("node_labels"):
@@ -182,6 +243,14 @@ def build_plotly_topology(nodes_state: dict):
             c = '#ef4444'; s = 56
         elif status == 'contained':
             c = '#facc15'; s = 46
+        elif ninfo.get('recovered'):
+            c = '#a78bfa'; s = 48
+        elif ninfo.get('isolated'):
+            c = '#fb923c'; s = 48
+        elif ninfo.get('blocked'):
+            c = '#60a5fa'; s = 48
+        elif ninfo.get('priority'):
+            c = '#f59e0b'; s = 46
         elif ninfo.get('defender_action') and ninfo.get('defender_action') != 'None':
             c = '#38bdf8'; s = 48
         else:
@@ -282,10 +351,18 @@ def build_plotly_topology(nodes_state: dict):
 
         ninfo = nodes_state.get(i, {})
         status = ninfo.get("status", "healthy")
-        if status == "compromised":
+        if status == 'compromised':
             color, size = "#ef4444", 56
-        elif status == "contained":
+        elif status == 'contained':
             color, size = "#facc15", 46
+        elif ninfo.get('recovered'):
+            color, size = "#a78bfa", 48
+        elif ninfo.get('isolated'):
+            color, size = "#fb923c", 48
+        elif ninfo.get('blocked'):
+            color, size = "#60a5fa", 48
+        elif ninfo.get('priority'):
+            color, size = "#f59e0b", 46
         elif ninfo.get("defender_action") and ninfo.get("defender_action") != "None":
             color, size = "#38bdf8", 48
         else:
@@ -411,13 +488,13 @@ def _persist_runtime_artifacts(state_obj):
     except Exception:
         st.session_state.attack_df = None
     try:
-        st.session_state.mitre_df = build_mitre_table(metrics_snapshot.get("technique_counts", {}))
+        # FIX #21: Use IOC-registry-derived counts for MITRE table
+        _snap_ioc = IOCEngine.generate_registry_df(state_obj.get("events", []))
+        st.session_state.mitre_df = build_mitre_table(metrics_snapshot.get("technique_counts", {}), ioc_df=_snap_ioc)
+        st.session_state.ioc_df = _snap_ioc  # keep in sync
     except Exception:
         st.session_state.mitre_df = None
-    try:
-        st.session_state.ioc_df = IOCEngine.generate_registry_df(state_obj.get("events", []))
-    except Exception:
-        st.session_state.ioc_df = None
+    # ioc_df already set in the block above (kept in sync with mitre_df)
     _persist_topology(state_obj.get("nodes", {}))
     try:
         graph_bytes = generate_network_graph(
@@ -683,25 +760,47 @@ def _render_top_kpis(metrics_local=None):
 
 
 def _render_infra_status():
-    """Real infrastructure service status (DVWA, MySQL, Nginx)."""
+    """Real infrastructure service status (DVWA, MySQL, Nginx).
+    FIX #8: Infrastructure cards now reflect simulation compromise/isolation state.
+    """
     services = scan_local_services()
     st.markdown("## Infrastructure Status")
+
+    # FIX #8: Read node states from simulation canonical state
+    sim_nodes = {}
+    try:
+        sim_nodes = st.session_state.simulation_state.get("nodes", {})
+    except Exception:
+        pass
+
+    # Node IDs: 0=Nginx, 1=DVWA, 2=MySQL, 3=Server, 4=DC, 5=Workstation
+    def _node_status_label(node_id: int, service_online: bool, service_name: str) -> tuple:
+        """Returns (label, status_fn) where status_fn is st.success/st.warning/st.error."""
+        node = sim_nodes.get(node_id, {})
+        card_status = node.get("card_status", "ONLINE")
+        sim_status = node.get("status", "healthy")
+
+        if card_status == "COMPROMISED" or sim_status == "compromised":
+            return f"{service_name} : ⚠️ COMPROMISED", "error"
+        elif card_status == "ISOLATED" or sim_status == "contained":
+            return f"{service_name} : 🔒 ISOLATED", "warning"
+        elif card_status == "BLOCKED":
+            return f"{service_name} : 🚫 BLOCKED", "warning"
+        elif not service_online:
+            return f"{service_name} : OFFLINE", "error"
+        else:
+            return f"{service_name} : ✅ ONLINE", "success"
+
     svc1, svc2, svc3 = st.columns(3)
     with svc1:
-        if services["DVWA"]:
-            st.success("DVWA Vulnerable Web App : ONLINE")
-        else:
-            st.error("DVWA Vulnerable Web App : OFFLINE")
+        label, fn = _node_status_label(1, services["DVWA"], "DVWA Vulnerable Web App")
+        getattr(st, fn)(label)
     with svc2:
-        if services["MySQL"]:
-            st.success("MySQL Database : ONLINE")
-        else:
-            st.error("MySQL Database : OFFLINE")
+        label, fn = _node_status_label(2, services["MySQL"], "MySQL Database")
+        getattr(st, fn)(label)
     with svc3:
-        if services["Nginx"]:
-            st.success("Nginx Internal Service : ONLINE")
-        else:
-            st.error("Nginx Internal Service : OFFLINE")
+        label, fn = _node_status_label(0, services["Nginx"], "Nginx Internal Service")
+        getattr(st, fn)(label)
 
 
 def _render_event_console(logs: list, placeholder=None):
@@ -929,6 +1028,8 @@ def render_overview_runtime_page():
     top_kpi_container = st.container()
     with top_kpi_container:
         _render_top_kpis(metrics_local=metrics_local)
+        # Note: removed secondary Security Monitoring Console cards here
+        # to ensure the Console appears only once (below SOC Trend Analytics).
 
     # 3) Infrastructure status
     infra_container = st.container()
@@ -1046,7 +1147,7 @@ def render_overview_runtime_page():
 
         display_columns = [
             "Event ID", "Time", "Stage", "Severity", "Technique", "Target Node",
-            "Source Node", "CVE", "Actor", "Confidence", "Status"
+            "Source Node", "CVE", "Actor", "Defender Action", "Confidence", "Status"
         ]
 
         if timeline_df is not None and not timeline_df.empty:
@@ -1181,6 +1282,37 @@ def render_overview_runtime_page():
             st.markdown('<div class="empty-placeholder">&#9654; Attack timeline will appear here once events are generated.</div>', unsafe_allow_html=True)
 
     # Return containers and slots so the simulation runtime can update them directly
+    # 8) Security Monitoring Console (moved to bottom of Overview per UX)
+    sec_container = st.container()
+    with sec_container:
+        try:
+            m = metrics_local
+            render_kpi_cards(
+                critical_alerts=m.get("critical_alerts", 0),
+                sqli_detected=m.get("sqli_detected", 0),
+                recon_events=m.get("recon_events", 0),
+                discovery_events=m.get("discovery_events", 0),
+                risk_score=m.get("risk_score", 0.0),
+                incident_priority=m.get("incident_priority", "LOW"),
+                incident_status=m.get("incident_status", "NORMAL"),
+                attack_success_rate=m.get("attack_success_rate", 0.0),
+                defense_effectiveness=m.get("defense_effectiveness", 0.0),
+                attacker_profile=m.get("attacker_profile", "Unknown"),
+                estimated_dwell_time=m.get("estimated_dwell_time", 0),
+                high_severity_events=m.get("high_severity_events", 0),
+                isolation_actions=m.get("isolation_actions", 0),
+                recovery_actions=m.get("recovery_actions", 0),
+                block_actions=m.get("block_actions", 0),
+                priority_actions=m.get("priority_actions", 0),
+                attacker_reward=m.get("attacker_reward", 0.0),
+                defender_reward=m.get("defender_reward", 0.0),
+                nodes_recovered=m.get("nodes_recovered", 0),
+                nodes_isolated=m.get("nodes_isolated", 0),
+                nodes_blocked=m.get("nodes_blocked", 0),
+            )
+        except Exception:
+            pass
+
     return header_container, top_kpi_container, infra_container, graph_slot, feed_slot, chart_slot, timeline_table_slot
 
 
@@ -1193,6 +1325,8 @@ def render_overview_page():
 
     with st.container():
         _render_top_kpis(metrics_local=metrics_local)
+        # Secondary MARL KPI cards intentionally removed from top of Overview
+        # to avoid duplicating the Security Monitoring Console section.
 
     with st.container():
         _render_infra_status()
@@ -1246,6 +1380,36 @@ def render_overview_page():
                 key="overview_soc_trend_chart_static",
                 metrics_local=metrics_local,
             )
+
+    # Security Monitoring Console (moved below SOC Trend Analytics)
+    with st.container():
+        try:
+            m = metrics_local
+            render_kpi_cards(
+                critical_alerts=m.get("critical_alerts", 0),
+                sqli_detected=m.get("sqli_detected", 0),
+                recon_events=m.get("recon_events", 0),
+                discovery_events=m.get("discovery_events", 0),
+                risk_score=m.get("risk_score", 0.0),
+                incident_priority=m.get("incident_priority", "LOW"),
+                incident_status=m.get("incident_status", "NORMAL"),
+                attack_success_rate=m.get("attack_success_rate", 0.0),
+                defense_effectiveness=m.get("defense_effectiveness", 0.0),
+                attacker_profile=m.get("attacker_profile", "Unknown"),
+                estimated_dwell_time=m.get("estimated_dwell_time", 0),
+                high_severity_events=m.get("high_severity_events", 0),
+                isolation_actions=m.get("isolation_actions", 0),
+                recovery_actions=m.get("recovery_actions", 0),
+                block_actions=m.get("block_actions", 0),
+                priority_actions=m.get("priority_actions", 0),
+                attacker_reward=m.get("attacker_reward", 0.0),
+                defender_reward=m.get("defender_reward", 0.0),
+                nodes_recovered=m.get("nodes_recovered", 0),
+                nodes_isolated=m.get("nodes_isolated", 0),
+                nodes_blocked=m.get("nodes_blocked", 0),
+            )
+        except Exception:
+            pass
 
 
 def render_threat_hunt_page():
@@ -1643,7 +1807,7 @@ if False and run_button:
 
                     display_columns = [
                         "Event ID", "Time", "Stage", "Severity", "Technique", "Target Node",
-                        "Source Node", "CVE", "Actor", "Confidence", "Status"
+                        "Source Node", "CVE", "Actor", "Defender Action", "Confidence", "Status"
                     ]
 
                     if preview_df is not None and not preview_df.empty:
@@ -1685,13 +1849,16 @@ if False and run_button:
     except Exception:
         attack_df = None
     try:
-        mitre_df = build_mitre_table(metrics.get("technique_counts", {}))
-    except Exception:
-        mitre_df = None
-    try:
+        # FIX #30: Generate IOC registry first, then derive MITRE table from it.
+        # This ensures PDF report uses same technique counts as dashboard MITRE panel.
         ioc_df = IOCEngine.generate_registry_df(state.get("events", []))
     except Exception:
         ioc_df = None
+    try:
+        # FIX #21/#30: Pass ioc_df to build_mitre_table so it uses IOC registry counts
+        mitre_df = build_mitre_table(metrics.get("technique_counts", {}), ioc_df=ioc_df)
+    except Exception:
+        mitre_df = None
 
     # Live feed entries
     live_feed = metrics.get("event_logs", [])

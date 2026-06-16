@@ -95,6 +95,33 @@ def generate_soc_pdf_report(
     All inputs are consumed read-only. The function performs reasonable
     truncation for wide/tall tables to avoid overly long pages.
     """
+    # FIX #30: Re-derive MITRE technique counts from IOC registry when available.
+    # This ensures PDF report matches the dashboard MITRE panel.
+    if ioc_df is not None:
+        try:
+            import pandas as _pd_fix
+            if isinstance(ioc_df, _pd_fix.DataFrame) and not ioc_df.empty and "Type" in ioc_df.columns:
+                import re as _re_fix
+                _TECH_RE = _re_fix.compile(r"T\d{4}(?:\.\d{3})?", _re_fix.IGNORECASE)
+                _tech_rows = ioc_df[
+                    ioc_df["Type"].astype(str).str.contains("Adversary Technique", na=False) &
+                    ioc_df["IOC"].astype(str).str.match(r"T\d{4}", na=False)
+                ]
+                if not _tech_rows.empty and "Count" in _tech_rows.columns:
+                    _ioc_counts = {}
+                    for _, _r in _tech_rows.iterrows():
+                        _tech_key = str(_r["IOC"]).strip().upper()
+                        _cnt = int(_r.get("Count", 1) or 1)
+                        _ioc_counts[_tech_key] = _ioc_counts.get(_tech_key, 0) + _cnt
+                    if _ioc_counts:
+                        # Override mitre_df with IOC-registry-derived counts
+                        mitre_df = _pd_fix.DataFrame({
+                            "Technique": list(_ioc_counts.keys()),
+                            "Frequency": list(_ioc_counts.values()),
+                        }).sort_values("Frequency", ascending=False).reset_index(drop=True)
+        except Exception:
+            pass  # fall through to original mitre_df handling
+
     # Lazy-import reportlab and plotly at runtime to avoid import-time crashes
     try:
         from reportlab.lib.pagesizes import letter
@@ -397,6 +424,8 @@ def generate_soc_pdf_report(
     threat_level = (soc_metrics or {}).get("threat_level") or (sidebar_summary or {}).get("threat", "N/A")
     risk_score = (soc_metrics or {}).get("risk_score") or (sidebar_summary or {}).get("risk", 0.0)
     compromised_assets = (soc_metrics or {}).get("compromised_assets") or []
+    if isinstance(compromised_assets, set):
+        compromised_assets = sorted(list(compromised_assets)) if compromised_assets else []
     defense_eff = (soc_metrics or {}).get("defense_effectiveness") or "N/A"
     soc_reco = (soc_metrics or {}).get("soc_recommendation") or "N/A"
 
@@ -461,7 +490,7 @@ def generate_soc_pdf_report(
             cnt = len(_ensure_list((metrics or {}).get("compromised_assets", []))) if metrics else 0
             obs = f"{cnt} compromised node(s) observed in the current incident."
             analysis = "Lateral movement indicators suggest the attacker traversed exposed hosts."
-            reco = "Isolate critical infrastructure (DomainController, Firewall/DVWA) immediately."
+            reco = "Isolate critical infrastructure (DomainController, DVWA, MySQL) immediately."
         elif chart == "soc_trend":
             obs = "Observed upward trend in event counts over the monitoring window."
             analysis = "SOC trending indicates increased attack surface activity; correlate with IOCs."
@@ -514,6 +543,78 @@ def generate_soc_pdf_report(
 
     # ------------------ Page 4: Attack Timeline ------------------
     # Ensure the Attack Timeline starts on a new page (Page 2 of content)
+    # Insert Defender Activity Summary page before the Attack Timeline
+    story.append(PageBreak())
+    story.append(Paragraph("Defender Activity Summary", h2))
+    # Compose defender activity table from soc_metrics
+    def_actions = {
+        "Isolation Actions": soc_metrics.get("isolation_actions", 0),
+        "Recovery Actions": soc_metrics.get("recovery_actions", 0),
+        "Block Actions": soc_metrics.get("block_actions", 0),
+        "Priority Actions": soc_metrics.get("priority_actions", 0),
+    }
+    rewards = {
+        "Attacker Reward": soc_metrics.get("attacker_reward", 0.0),
+        "Defender Reward": soc_metrics.get("defender_reward", 0.0),
+    }
+    node_aggs = {
+        "Nodes Recovered": soc_metrics.get("nodes_recovered", 0),
+        "Nodes Isolated": soc_metrics.get("nodes_isolated", 0),
+        "Nodes Blocked": soc_metrics.get("nodes_blocked", 0),
+    }
+    # FIX #1/#30: Winner based on actual simulation outcome, not just reward comparison.
+    # Attacker wins if: exfiltration occurred, OR compromised count >= node threshold,
+    # OR attack success rate high AND defense effectiveness low.
+    # Defender wins only if they contained the attack with meaningful effectiveness.
+    try:
+        _compromised = soc_metrics.get("compromised_count", 0) or 0
+        _node_count = soc_metrics.get("total_nodes", 6) or 6
+        _exfil_flag = (str(soc_metrics.get("attack_stage", "") or "").lower() == "exfiltration")
+        _atk_success_rate = float(soc_metrics.get("attack_success_rate", 0) or 0)
+        _def_effectiveness = float(soc_metrics.get("defense_effectiveness", 0) or 0)
+        _incident_status = str(soc_metrics.get("incident_status", "") or "").upper()
+        # Attacker wins conditions
+        _atk_wins = (
+            _exfil_flag or
+            _compromised >= (_node_count - 1) or
+            (_atk_success_rate >= 70 and _def_effectiveness < 25) or
+            "BREACH" in _incident_status
+        )
+        # If no decisive win, determine by relative performance
+        if _atk_wins:
+            final_winner = "Attacker"
+        elif _def_effectiveness >= 50 and _compromised == 0:
+            final_winner = "Defender"
+        elif float(rewards["Defender Reward"]) > float(rewards["Attacker Reward"]) * 1.5:
+            final_winner = "Defender"
+        elif float(rewards["Attacker Reward"]) > float(rewards["Defender Reward"]) * 1.5:
+            final_winner = "Attacker"
+        else:
+            final_winner = "Draw / Indeterminate"
+    except Exception:
+        final_winner = "Undetermined"
+
+    # Build table rows
+    das_rows = []
+    for k, v in def_actions.items():
+        das_rows.append([Paragraph(f"<b>{k}</b>", normal), Paragraph(str(v), normal)])
+    for k, v in node_aggs.items():
+        das_rows.append([Paragraph(f"<b>{k}</b>", normal), Paragraph(str(v), normal)])
+    for k, v in rewards.items():
+        das_rows.append([Paragraph(f"<b>{k}</b>", normal), Paragraph(str(v), normal)])
+    das_rows.append([Paragraph("<b>Defense Effectiveness</b>", normal), Paragraph(str(soc_metrics.get("defense_effectiveness", "N/A"),), normal)])
+    das_rows.append([Paragraph("<b>Final Winner</b>", normal), Paragraph(str(final_winner), normal)])
+
+    das_table = Table(das_rows, colWidths=[2.5 * inch, content_width - 2.5 * inch])
+    das_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("BOX", (0, 0), (-1, -1), 0.25, colors.grey),
+    ]))
+    story.append(das_table)
+    story.append(Spacer(1, 8))
+
+    # Start the Attack Timeline page after the Defender Activity Summary
     story.append(PageBreak())
     story.append(Paragraph("Attack Timeline", h2))
     # Keep only important columns and paginate
@@ -770,7 +871,7 @@ def generate_soc_pdf_report(
     mitre_block.append(Paragraph("<b>Observation</b>", normal))
     mitre_block.append(Paragraph("Persistence and exfiltration techniques dominated the attack lifecycle.", normal))
     mitre_block.append(Paragraph("<b>SOC Analysis</b>", normal))
-    mitre_block.append(Paragraph("T1547 and T1486 indicate sustained persistence and ransomware-style activity.", normal))
+    mitre_block.append(Paragraph("Observed techniques indicate multi-stage attack activity. Review IOC registry for correlated CVEs and impacted assets.", normal))
     mitre_block.append(Paragraph("<b>Recommendation</b>", normal))
     mitre_block.append(Paragraph("Prioritize containment and credential isolation to reduce lateral movement.", normal))
 
@@ -790,19 +891,24 @@ def generate_soc_pdf_report(
     if _has_data(ioc_df):
         try:
             ioc_rows = ioc_df.to_dict(orient="records") if pd is not None and isinstance(ioc_df, pd.DataFrame) else ioc_df
-            headers = ["IOC", "Type", "Severity", "First Seen", "Count", "Confidence"]
+            # FIX: Add Asset and CVSS columns to IOC table in PDF
+            headers = ["IOC", "Type", "Severity", "Asset", "CVSS", "Count", "Confidence"]
             data = [[Paragraph(h, small) for h in headers]]
             for r in ioc_rows:
+                # For CVE rows, show CVSS from enrichment; for others leave blank
+                cvss_val = str(r.get("CVSS") or "") if r.get("Type") in ("CVE", "Adversary Technique") else ""
+                asset_val = str(r.get("Asset") or "")
                 row = [
                     _to_paragraph(r.get("IOC") or r.get("ioc"), style=small),
                     _to_paragraph(r.get("Type") or r.get("type"), style=small),
                     _to_paragraph(r.get("Severity") or r.get("severity"), style=small),
-                    _to_paragraph(r.get("First Seen") or r.get("first_seen") or r.get("firstSeen"), style=small),
+                    _to_paragraph(asset_val, style=small),
+                    _to_paragraph(cvss_val, style=small),
                     _to_paragraph(r.get("Count") or r.get("count"), style=small),
                     _to_paragraph(r.get("Confidence") or r.get("confidence"), style=small),
                 ]
                 data.append(row)
-            colw = [2.0 * inch, 0.9 * inch, 0.9 * inch, 1.0 * inch, 0.7 * inch, 0.9 * inch]
+            colw = [1.6 * inch, 0.85 * inch, 0.75 * inch, 0.9 * inch, 0.55 * inch, 0.5 * inch, 0.75 * inch]
             tbl = Table(data, colWidths=colw)
             ts = TableStyle([
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
@@ -831,7 +937,56 @@ def generate_soc_pdf_report(
     else:
         page4_block.append(Paragraph("No IOC indicators available.", normal))
 
-    # Executive Recommendations follow immediately after the IOC table
+    # FIX: Add "CVEs Exploited" summary section after IOC table
+    page4_block.append(Spacer(1, 10))
+    page4_block.append(Paragraph("CVEs Exploited During Campaign", h2))
+    try:
+        if _has_data(ioc_df):
+            _ioc_rows_cve = ioc_df.to_dict(orient="records") if pd is not None and isinstance(ioc_df, pd.DataFrame) else []
+            _cve_rows = [r for r in _ioc_rows_cve if str(r.get("Type", "")).strip() == "CVE"]
+            if _cve_rows:
+                cve_summary_data = [[
+                    Paragraph("<b>CVE ID</b>", small),
+                    Paragraph("<b>Asset</b>", small),
+                    Paragraph("<b>CVSS</b>", small),
+                    Paragraph("<b>MITRE</b>", small),
+                    Paragraph("<b>Severity</b>", small),
+                    Paragraph("<b>Confidence</b>", small),
+                ]]
+                for _cr in _cve_rows:
+                    cve_summary_data.append([
+                        _to_paragraph(_cr.get("IOC") or "", style=small),
+                        _to_paragraph(_cr.get("Asset") or "", style=small),
+                        _to_paragraph(str(_cr.get("CVSS") or ""), style=small),
+                        _to_paragraph(_cr.get("MITRE") or "", style=small),
+                        _to_paragraph(_cr.get("Severity") or "", style=small),
+                        _to_paragraph(str(_cr.get("Confidence") or ""), style=small),
+                    ])
+                _cve_colw = [1.8*inch, 1.0*inch, 0.6*inch, 0.8*inch, 0.8*inch, 0.85*inch]
+                _cve_tbl = Table(cve_summary_data, colWidths=_cve_colw)
+                _cve_ts = TableStyle([
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0b1220")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ])
+                for _i, _cr in enumerate(_cve_rows, start=1):
+                    _sev = str(_cr.get("Severity") or "").lower()
+                    _bg = colors.white
+                    if "critical" in _sev:
+                        _bg = colors.HexColor("#fde8e8")
+                    elif "high" in _sev:
+                        _bg = colors.HexColor("#fff4e6")
+                    _cve_ts.add("BACKGROUND", (0, _i), (-1, _i), _bg)
+                _cve_tbl.setStyle(_cve_ts)
+                page4_block.append(_cve_tbl)
+            else:
+                page4_block.append(Paragraph("No CVEs were observed during this simulation.", normal))
+    except Exception:
+        page4_block.append(Paragraph("CVE data could not be rendered.", normal))
+
+    # Executive Recommendations follow immediately after the CVE table
     tactical = (soc_metrics or {}).get("tactical_recommendation") or []
     exec_strategy = (soc_metrics or {}).get("executive_response_strategy") or ""
     page4_block.append(Spacer(1, 8))

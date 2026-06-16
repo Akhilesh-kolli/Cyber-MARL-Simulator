@@ -3,15 +3,18 @@ utils/constants.py
 ------------------
 Central configuration registry for all cyber range settings,
 threat intelligence ranges, risk weights, and vulnerability mappings.
+
+FIX: ATTACK_SEVERITY expanded to cover all valid technique IDs.
+FIX: INVALID_TECHNIQUE_VALUES updated to exclude DEFENSIVE-OPS from MITRE counts.
 """
 
 # Simulation Node Roles / Topology Mappings
 SIMULATION_NODES = {
-    0: "Workstation",
-    1: "Firewall",
-    2: "Database",
+    0: "Nginx",
+    1: "DVWA",
+    2: "MySQL",
     3: "Server",
-    4: "DomainController",
+    4: "Domain-Controller",
     5: "Workstation",
 }
 
@@ -66,28 +69,42 @@ STAGE_RANGES = {
     "Mitigation": (0, 50),
 }
 
-# MITRE Techniques
+# MITRE Techniques — valid technique IDs recognized by the platform
 VALID_TECHNIQUES = {
     "T1190", "T1021", "T1046", "T1059", "T1078", "T1003", "T1105",
-    "T1562", "T1055", "T1547", "T1486", "T1110", "T1595"
+    "T1562", "T1055", "T1547", "T1486", "T1110", "T1595", "T1041",
+    "T1005", "T1057", "T1070", "T1489", "T1565",
 }
-INVALID_TECHNIQUE_VALUES = {"N/A", "UNKNOWN", None, ""}
 
-# Attack severity mapping for additional MITRE techniques
+# FIX: INVALID_TECHNIQUE_VALUES must include all synthetic/non-MITRE placeholders
+# so they are filtered out of MITRE analytics.
+INVALID_TECHNIQUE_VALUES = {
+    "N/A", "UNKNOWN", None, "",
+    "DEFENSIVE-OPS", "DEFENDER-ACTION", "NOT-APPLICABLE",
+    "DEFENDER",
+}
+
+# FIX: Full ATT&CK severity mapping covering all technique IDs used in the simulation
 ATTACK_SEVERITY = {
-    "T1190": "CRITICAL",
-    "T1021": "HIGH",
-    "T1046": "MEDIUM",
-    "T1059": "HIGH",
-    "T1078": "HIGH",
-    "T1003": "CRITICAL",
-    "T1105": "HIGH",
-    "T1562": "MEDIUM",
-    "T1055": "HIGH",
-    "T1547": "HIGH",
-    "T1486": "CRITICAL",
-    "T1110": "HIGH",
-    "T1595": "LOW",
+    "T1190": "CRITICAL",  # Exploit Public-Facing Application
+    "T1021": "HIGH",      # Remote Services
+    "T1046": "MEDIUM",    # Network Service Discovery
+    "T1059": "HIGH",      # Command & Scripting Interpreter
+    "T1078": "HIGH",      # Valid Accounts
+    "T1003": "CRITICAL",  # OS Credential Dumping
+    "T1105": "HIGH",      # Ingress Tool Transfer
+    "T1562": "MEDIUM",    # Impair Defenses
+    "T1055": "HIGH",      # Process Injection
+    "T1547": "HIGH",      # Boot/Logon Autostart Execution
+    "T1486": "CRITICAL",  # Data Encrypted for Impact
+    "T1110": "HIGH",      # Brute Force
+    "T1595": "LOW",       # Active Scanning
+    "T1041": "HIGH",      # Exfiltration Over C2 Channel
+    "T1005": "MEDIUM",    # Data from Local System
+    "T1057": "LOW",       # Process Discovery
+    "T1070": "MEDIUM",    # Indicator Removal
+    "T1489": "CRITICAL",  # Service Stop
+    "T1565": "HIGH",      # Data Manipulation
 }
 
 # Vulnerability Database
@@ -111,6 +128,27 @@ VULNERABILITY_DB = {
         "name": "Nginx Resolver RCE",
         "cvss": 7.7,
         "mitre": "T1190",
+        "severity": "HIGH",
+    },
+    "Server": {
+        "cve": "CVE-2021-44228",
+        "name": "Log4Shell Remote Code Execution",
+        "cvss": 10.0,
+        "mitre": "T1059",
+        "severity": "CRITICAL",
+    },
+    "Domain-Controller": {
+        "cve": "CVE-2020-1472",
+        "name": "ZeroLogon Privilege Escalation",
+        "cvss": 10.0,
+        "mitre": "T1055",
+        "severity": "CRITICAL",
+    },
+    "Workstation": {
+        "cve": "CVE-2022-30190",
+        "name": "Follina MSDT RCE",
+        "cvss": 7.8,
+        "mitre": "T1059",
         "severity": "HIGH",
     },
 }
@@ -145,12 +183,14 @@ DETECTION_RULES = {
         "severity": "LOW",
         "confidence": 73,
     },
-}
-
-# Attack severity mapping
-ATTACK_SEVERITY = {
-    "T1190": "CRITICAL",
-    "T1021": "HIGH",
-    "T1046": "MEDIUM",
-    "T1595": "LOW",
+    "Process Injection": {
+        "signature": "SIGMA Process Injection via Reflective DLL",
+        "severity": "HIGH",
+        "confidence": 85,
+    },
+    "Brute Force": {
+        "signature": "ET POLICY Failed SSH Login Attempt",
+        "severity": "MEDIUM",
+        "confidence": 78,
+    },
 }

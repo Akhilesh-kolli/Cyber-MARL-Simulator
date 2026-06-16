@@ -23,7 +23,18 @@ def render_metrics_cards(state: dict):
         incident_status=metrics.get("incident_status", "IDLE"),
         attack_success_rate=metrics.get("attack_success_rate", 0.0),
         defense_effectiveness=metrics.get("defense_effectiveness", 0.0),
+        # MARL new KPIs
+        isolation_actions=metrics.get("isolation_actions", 0),
+        recovery_actions=metrics.get("recovery_actions", 0),
+        block_actions=metrics.get("block_actions", 0),
+        priority_actions=metrics.get("priority_actions", 0),
+        attacker_reward=metrics.get("attacker_reward", 0.0),
+        defender_reward=metrics.get("defender_reward", 0.0),
+        nodes_recovered=metrics.get("nodes_recovered", 0),
+        nodes_isolated=metrics.get("nodes_isolated", 0),
+        nodes_blocked=metrics.get("nodes_blocked", 0),
         attacker_profile=metrics.get("attacker_profile", "Unknown"),
         estimated_dwell_time=metrics.get("estimated_dwell_time", 0),
         high_severity_events=metrics.get("high_severity_events", 0)
+        , show_header=False
     )

@@ -38,13 +38,22 @@ def generate_network_graph(nodes_state: dict, env_graph, env_node_types, env_nod
     def get_color(node_id):
         node_info = nodes_state.get(node_id, {})
         status = node_info.get("status", "healthy")
+        # Priority of colors: compromised -> contained -> recovered -> isolated -> blocked -> priority flag -> defender_action -> healthy
         if status == "compromised":
-            return "#ef4444"
-        elif status == "contained":
-            return "#facc15"
-        elif node_info.get("defender_action") != "None":
-            return "#38bdf8"
-        return "#22c55e"
+            return "#ef4444"  # red
+        if status == "contained":
+            return "#facc15"  # yellow
+        if node_info.get("recovered"):
+            return "#a78bfa"  # purple
+        if node_info.get("isolated"):
+            return "#fb923c"  # orange
+        if node_info.get("blocked"):
+            return "#60a5fa"  # blue
+        if node_info.get("priority"):
+            return "#f59e0b"  # amber for priority
+        if node_info.get("defender_action") != "None":
+            return "#38bdf8"  # cyan fallback for any defender action
+        return "#22c55e"  # green healthy
 
     def get_size(node_id):
         node_info = nodes_state.get(node_id, {})

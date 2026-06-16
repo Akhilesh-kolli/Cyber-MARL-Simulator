@@ -117,7 +117,7 @@ def render_clean_timeline_section(state: dict):
     # Build display columns and include 'Frequency' when present
     display_columns = [
         "Event ID", "Time", "Stage", "Severity", "Technique", "Target Node",
-        "Source Node", "CVE", "Actor", "Confidence", "Status"
+        "Source Node", "CVE", "Actor", "Defender Action", "Confidence", "Status"
     ]
     if "Frequency" in timeline_df.columns:
         # insert Frequency after Technique for better readability
@@ -197,7 +197,7 @@ def render_timeline_section(state: dict):
         # Build display columns and include 'Frequency' when present
         display_columns = [
             "Event ID", "Time", "Stage", "Severity", "Technique", "Target Node",
-            "Source Node", "CVE", "Actor", "Confidence", "Status"
+            "Source Node", "CVE", "Actor", "Defender Action", "Confidence", "Status"
         ]
         if "Frequency" in filtered_df.columns:
             insert_at = display_columns.index("Technique") + 1

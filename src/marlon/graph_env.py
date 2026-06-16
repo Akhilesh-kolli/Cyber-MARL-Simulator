@@ -37,11 +37,11 @@ class GraphCyberEnv(gym.Env):
         # NODE TYPES
         # ==================================================
         self.node_types = {
-            0: "Workstation",
-            1: "Firewall",
-            2: "Database",
+            0: "Nginx",
+            1: "DVWA",
+            2: "MySQL",
             3: "Server",
-            4: "DomainController",
+            4: "Domain-Controller",
             5: "Workstation"
         }
 

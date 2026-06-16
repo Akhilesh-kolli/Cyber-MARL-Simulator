@@ -8,6 +8,105 @@ import streamlit as st
 from analytics.mitre_mapper import get_dominant_technique
 from exports.pdf_exporter import generate_soc_pdf_report
 from datetime import datetime
+import traceback
+import base64
+import streamlit.components.v1 as components
+
+
+def _to_safe_payload(obj):
+    """Coerce common payload types into safe, printable forms for PDF generation.
+
+    - DataFrames -> stringified DataFrame (if pandas available)
+    - list-of-dicts -> list with all values converted to str
+    - lists -> list of str
+    - dicts -> dict with values converted to str
+    Other objects are returned as-is.
+    """
+    if obj is None:
+        return None
+    try:
+        import pandas as pd
+        if isinstance(obj, pd.DataFrame):
+            # replace NaNs and coerce all cells to str to avoid reportlab internals
+            return obj.fillna("").astype(str)
+    except Exception:
+        pass
+
+    if isinstance(obj, list):
+        out = []
+        for item in obj:
+            if isinstance(item, dict):
+                out.append({k: ("" if v is None else str(v)) for k, v in item.items()})
+            else:
+                out.append(str(item))
+        return out
+
+    if isinstance(obj, dict):
+        return {k: ("" if v is None else str(v)) for k, v in obj.items()}
+
+    return obj
+
+
+def _generate_and_download_pdf(status_placeholder=None):
+        """Generate the PDF bytes and trigger a one-shot client-side download.
+
+        This intentionally avoids showing any 'Generating…' message — it should
+        simply open the Save dialog and leave the layout unchanged.
+        """
+        # build a sanitized payload for most items, but pass raw DataFrames/lists
+        # to the PDF exporter so numeric data (e.g., MITRE counts) remain typed.
+        soc_metrics = _to_safe_payload(st.session_state.get("soc_metrics", {}))
+        sidebar_summary = _to_safe_payload(st.session_state.get("sidebar_summary", {}))
+        # Pass raw structures where the exporter may reconstruct figures or charts
+        attack_df = st.session_state.get("attack_df")
+        mitre_df = st.session_state.get("mitre_df")
+        ioc_df = st.session_state.get("ioc_df")
+        live_feed = st.session_state.get("live_feed", [])
+
+        try:
+                pdf_bytes = generate_soc_pdf_report(
+                        soc_metrics=soc_metrics,
+                        sidebar_summary=sidebar_summary,
+                        attack_timeline_df=attack_df,
+                        mitre_df=mitre_df,
+                        ioc_df=ioc_df,
+                        live_feed=live_feed,
+                )
+
+                # One-shot client-side download — render an invisible iframe (height=0)
+                b64 = base64.b64encode(pdf_bytes).decode("ascii")
+                fname = f"summary_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                html = f"""
+                <html>
+                    <body>
+                        <script>
+                            (function() {{
+                                const b64 = "{b64}";
+                                const byteCharacters = atob(b64);
+                                const byteNumbers = new Array(byteCharacters.length);
+                                for (let i = 0; i < byteCharacters.length; i++) {{
+                                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                                }}
+                                const byteArray = new Uint8Array(byteNumbers);
+                                const blob = new Blob([byteArray], {{type: 'application/pdf'}});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = "{fname}";
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(function() {{ document.body.removeChild(a); URL.revokeObjectURL(url); }}, 1000);
+                            }})();
+                        </script>
+                    </body>
+                </html>
+                """
+
+                components.html(html, height=0)
+        except ImportError:
+                st.warning("PDF export unavailable: install 'reportlab' in the environment (pip install reportlab)")
+        except Exception as e:
+                st.exception(e)
 
 def _exec_card(title, body, border_color="#0ea5e9"):
     return (
@@ -26,6 +125,8 @@ def render_executive_panel(state: dict):
     Renders the Executive View workspace from pre-computed metrics and narratives in state.
     """
     st.markdown("## 📋 Executive Response Strategy")
+
+    # (Generate button moved to panel bottom for predictable placement)
     
     # Check if simulation started
     if not state.get("events") and not state.get("simulation", {}).get("running", False):
@@ -39,14 +140,14 @@ def render_executive_panel(state: dict):
     exec_data = state["executive"]
 
     # -------------------------------------------------------
-    # PANEL 1 — RISK OVERVIEW
+    # PANEL 1 — STRATEGIC OVERVIEW (replace duplicated operational KPIs)
     # -------------------------------------------------------
-    st.markdown("### 🔴 Risk Overview")
+    st.markdown("### 🔎 Strategic Overview")
     risk_c1, risk_c2, risk_c3, risk_c4 = st.columns(4)
-    risk_c1.metric("Total Risk Score", metrics.get("risk_score", 0.0))
-    risk_c2.metric("Incident Priority", metrics.get("incident_priority", "LOW"))
-    risk_c3.metric("Incident Status", metrics.get("incident_status", "IDLE"))
-    risk_c4.metric("Compromised Nodes", metrics.get("compromised_count", 0))
+    risk_c1.metric("Strategic Risk", exec_data.get("executive_impact", "N/A"))
+    risk_c2.metric("Business Impact", f"{exec_data.get('business_impact_score', 0.0):.1f}")
+    risk_c3.metric("Response Priority", exec_data.get("response_priority", "N/A"))
+    risk_c4.metric("Recovery Outlook", f"{exec_data.get('containment_urgency', 0.0):.1f}/100")
 
     # -------------------------------------------------------
     # PANEL 2 — THREAT METRICS
@@ -173,35 +274,12 @@ def render_executive_panel(state: dict):
             unsafe_allow_html=True
         )
 
-    # -----------------------------
-    # PDF Export (Executive View only)
-    # -----------------------------
-    try:
-        # Build payload from session_state (source of truth)
-        soc_metrics = st.session_state.get("soc_metrics", {})
-        sidebar_summary = st.session_state.get("sidebar_summary", {})
-        attack_df = st.session_state.get("attack_df")
-        mitre_df = st.session_state.get("mitre_df")
-        ioc_df = st.session_state.get("ioc_df")
-        live_feed = st.session_state.get("live_feed", [])
+        pass
 
-        pdf_bytes = generate_soc_pdf_report(
-            soc_metrics=soc_metrics,
-            sidebar_summary=sidebar_summary,
-            attack_timeline_df=attack_df,
-            mitre_df=mitre_df,
-            ioc_df=ioc_df,
-            live_feed=live_feed,
-        )
-
-        fname = f"soc_incident_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        st.download_button(
-            label="📄 Download SOC Incident Report (PDF)",
-            data=pdf_bytes,
-            file_name=fname,
-            mime="application/pdf",
-            key="download_soc_pdf_button",
-        )
-    except Exception:
-        # Keep executive panel robust if PDF generation fails
-        st.markdown('<div class="empty-placeholder">PDF export currently unavailable.</div>', unsafe_allow_html=True)
+    # -----------------------------
+    # Bottom control: centered Generate button (one-shot download)
+    # -----------------------------
+    bottom_cols = st.columns([1, 4, 1])
+    with bottom_cols[1]:
+        if st.button("Generate Summary Report", key="generate_soc_pdf_btn"):
+            _generate_and_download_pdf(status_placeholder=st.empty())

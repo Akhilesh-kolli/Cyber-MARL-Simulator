@@ -6,7 +6,7 @@ import sys
 # allow imports from src/
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from marlon.graph_env import GraphCyberEnv
+from marlon.attacker_env import AttackerEnv
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     log_dir.mkdir(exist_ok=True)
 
     # ---- environment with logging enabled ----
-    env = GraphCyberEnv()
+    env = AttackerEnv()
     env = Monitor(env, str(log_dir / "attacker_monitor.csv"))
 
     model = PPO(

@@ -25,7 +25,7 @@ def map_attack_to_mitre(action_text):
     # --------------------------------------------------
     # Port discovery
     # --------------------------------------------------
-    elif "Port 3306 Open" in action_text:
+    elif "Port 3307 Open" in action_text:
 
         return {
             "technique": "T1046",

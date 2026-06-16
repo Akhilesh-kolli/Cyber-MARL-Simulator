@@ -10,7 +10,7 @@ def map_kill_chain(action_text):
     # --------------------------------------------------
     # Discovery
     # --------------------------------------------------
-    if "Port 3306 Open" in action_text:
+    if "Port 3307 Open" in action_text:
 
         return "Discovery"
 

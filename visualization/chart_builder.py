@@ -88,6 +88,16 @@ def render_mitre_pie(technique_counts: dict):
         st.markdown('<div class="empty-placeholder">No adversary techniques observed during current simulation steps.</div>', unsafe_allow_html=True)
         return None
 
+    # If only a single technique was observed, show an explanatory message
+    # instead of a misleading 100% donut chart.
+    if len(active) == 1:
+        tname, tfreq = list(active.items())[0]
+        st.markdown(
+            f'<div class="empty-placeholder">Only one ATT&CK technique was observed during this simulation. Additional technique diversity is required for meaningful ATT&CK distribution analysis.<br><strong>Observed:</strong> {tname} ({tfreq} occurrences)</div>',
+            unsafe_allow_html=True,
+        )
+        return None
+
     df = pd.DataFrame({
         "Technique": list(active.keys()),
         "Frequency": list(active.values()),

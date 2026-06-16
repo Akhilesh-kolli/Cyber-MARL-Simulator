@@ -17,7 +17,7 @@ def calculate_threat_level(action_text):
     # --------------------------------------------------
     # Service discovery
     # --------------------------------------------------
-    if "Port 3306 Open" in action_text:
+    if "Port 3307 Open" in action_text:
         score += 2
 
     # --------------------------------------------------
