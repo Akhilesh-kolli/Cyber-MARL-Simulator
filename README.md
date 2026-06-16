@@ -21,10 +21,6 @@
   <img src="https://img.shields.io/badge/Framework-CYMARL-darkred">
 </p>
 
-
-
----
-
 ---
 
 # Cymarl-Framework
