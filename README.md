@@ -58,7 +58,7 @@ The environment simulates cyber conflict scenarios where attackers attempt to co
 | Visualization | Matplotlib |
 | Numerical Computing | NumPy |
 | Data Handling | Pandas |
-| Platform | Kali Linux |
+| Platform | Windows |
 
 ---
 
