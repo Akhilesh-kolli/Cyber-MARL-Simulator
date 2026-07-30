@@ -15,6 +15,7 @@ from stable_baselines3.common.monitor import Monitor
 from pathlib import Path
 import sys
 import numpy as np
+import time
 
 # ── paths ──────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
@@ -33,6 +34,9 @@ log_dir   = ROOT / "logs"
 model_dir = ROOT / "models"
 log_dir.mkdir(exist_ok=True)
 model_dir.mkdir(exist_ok=True)
+
+# Start timing
+start_time = time.perf_counter()
 
 # ══════════════════════════════════════════════════════════════════════════
 # PHASE 1 — WARM-UP (solo training so each agent starts with some policy)
@@ -175,6 +179,10 @@ print("  TRAINING COMPLETE")
 print(f"  Attacker saved -> models/ppo_attacker_graph")
 print(f"  Defender saved -> models/ppo_defender_graph")
 print("="*60)
+
+# Stop timing
+elapsed = time.perf_counter() - start_time
+print(f"\nTraining Time: {elapsed/60:.2f} minutes")
 
 # ── final summary ──────────────────────────────────────────────────────────
 print(f"\n  Total self-play rounds  : {SELFPLAY_ROUNDS}")
