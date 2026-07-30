@@ -1,14 +1,24 @@
-# Cymarl-Framework
+# Multi Agent Cyber Defense and SOC simluation Platform
+
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Cybersecurity-MARL-darkred">
-  <img src="https://img.shields.io/badge/Reinforcement-Learning-blue">
-  <img src="https://img.shields.io/badge/PPO-Training-purple">
-  <img src="https://img.shields.io/badge/Attacker-Defender-orange">
+  <img src="https://img.shields.io/badge/CYMARL-Cyber%20Defense-darkred">
+  <img src="https://img.shields.io/badge/MARL-Multi--Agent%20RL-blue">
+  <img src="https://img.shields.io/badge/PPO-Attacker%20%26%20Defender-purple">
+  <img src="https://img.shields.io/badge/CVE-CVSS-orange">
+  <img src="https://img.shields.io/badge/MITRE-ATT%26CK-red">
+  <img src="https://img.shields.io/badge/Threat-Intelligence-black">
+  <img src="https://img.shields.io/badge/SOC-Analytics-green">
+  <img src="https://img.shields.io/badge/Risk-Assessment-yellowgreen">
+  <img src="https://img.shields.io/badge/Environment-Enterprise%20Graph-lightgrey">
+  <img src="https://img.shields.io/badge/Dashboard-Streamlit-ff4b4b">
   <img src="https://img.shields.io/badge/Python-Framework-yellow">
-  <img src="https://img.shields.io/badge/Kali-Linux-red">
-  <img src="https://img.shields.io/badge/Visualization-Matplotlib-green">
-  <img src="https://img.shields.io/badge/Environment-GraphBased-black">
+  <img src="https://img.shields.io/badge/Platform-Windows-red">
+  <img src="https://img.shields.io/badge/Research-Cybersecurity-blueviolet">
+  <img src="https://img.shields.io/badge/Status-Active-success">
+  <img src="https://img.shields.io/badge/License-Academic-lightgrey">
+  <img src="https://img.shields.io/badge/Domain-SOC%20Intelligence-darkgreen">
+  <img src="https://img.shields.io/badge/Framework-CYMARL-darkred">
 </p>
 
 ---
@@ -48,7 +58,7 @@ The environment simulates cyber conflict scenarios where attackers attempt to co
 | Visualization | Matplotlib |
 | Numerical Computing | NumPy |
 | Data Handling | Pandas |
-| Platform | Kali Linux |
+| Platform | Windows |
 
 ---
 
